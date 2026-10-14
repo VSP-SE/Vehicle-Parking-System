@@ -4,6 +4,7 @@ A web application for managing parking slots and tracking vehicles. It is the Le
 
 ## Team
 
+
 Team 10, Section C.
 
 | Name | SRN | GitHub |
