@@ -1,0 +1,13 @@
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "tests.settings"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["vps"]
+branch = true
+omit = ["*/migrations/*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["**/migrations/**"]
