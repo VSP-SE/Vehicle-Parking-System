@@ -27,7 +27,7 @@ Team 10, Section C.
 |---|---|
 | Version control | Git and GitHub |
 | Agile planning and bug tracking | GitHub Projects |
-| CI | GitHub Actions |
+| CI | GitHub Actions: ruff, PostgreSQL tests, coverage gates and security scans |
 | Testing | pytest with branch coverage |
 
 ## Deliverables
@@ -105,4 +105,4 @@ Stop the services with `docker compose down`. To reset the database, use
 
 ## Status
 
-Sprint 1 is under way. The Django project skeleton is in place, and CI runs on GitHub Actions for every push and pull request.
+Sprint 1 is under way. The Django project skeleton is in place. CI runs ruff, the test suite on PostgreSQL 16 with a 70% line and 60% branch coverage gate, pip-audit and a Gitleaks secret scan on every pull request.

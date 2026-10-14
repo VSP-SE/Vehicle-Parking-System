@@ -4,41 +4,109 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  test:
-    name: Lint and test
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v5
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
-          # Add `cache: pip` back once requirements.txt exists; setup-python
-          # fails if there is no dependency file to key the cache on.
-
+          cache: pip
+          cache-dependency-path: requirements*.txt
       - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
-          pip install pytest pytest-cov pytest-django ruff
-
+        run: python -m pip install -r requirements-dev.txt
       - name: Lint
-        run: ruff check . || true
+        run: ruff check .
 
-      - name: Run tests with coverage
-        # SQLite until the PostgreSQL service container lands (issue #13)
+  test:
+    name: Test (PostgreSQL)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
         env:
-          VPS_TEST_SQLITE: '1'
-        run: |
-          if [ -d tests ] && [ -n "$(find tests -name 'test_*.py' -print -quit)" ]; then
-            pytest --cov=. --cov-report=xml --cov-branch --junitxml=junit.xml
-          else
-            echo "No tests yet - skipping. Remove this branch once tests exist."
-          fi
+          POSTGRES_DB: vps
+          POSTGRES_USER: vps
+          POSTGRES_PASSWORD: vps
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U vps -d vps"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      POSTGRES_DB: vps
+      POSTGRES_USER: vps
+      POSTGRES_PASSWORD: vps
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: '5432'
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - name: Install dependencies
+        run: python -m pip install -r requirements-dev.txt
+      - name: Enable btree_gist in test database template
+        env:
+          PGPASSWORD: ${{ env.POSTGRES_PASSWORD }}
+        run: >-
+          psql -h localhost -p 5432 -U vps -d template1 -v ON_ERROR_STOP=1
+          -c 'CREATE EXTENSION IF NOT EXISTS btree_gist;'
+      - name: Run tests with coverage
+        run: pytest --cov --cov-branch --cov-report=term-missing --cov-report=xml --junitxml=junit.xml
+      - name: Enforce line and branch coverage
+        run: python scripts/check_coverage.py coverage.xml
+      - name: Upload test reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-reports
+          path: |
+            coverage.xml
+            junit.xml
 
+  security:
+    name: Security scans
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - name: Install dependency scanner
+        run: python -m pip install pip-audit==2.9.0
+      - name: Audit runtime dependencies
+        run: pip-audit -r requirements.txt --strict
+      - name: Scan repository history for secrets
+        if: ${{ !cancelled() }}
+        env:
+          GITLEAKS_VERSION: '8.24.3'
+        run: |
+          scan_dir="$(mktemp -d)"
+          trap 'rm -rf "$scan_dir"' EXIT
+          archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          release="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
+          curl -fsSL "$release/$archive" -o "$scan_dir/$archive"
+          curl -fsSL "$release/gitleaks_${GITLEAKS_VERSION}_checksums.txt" -o "$scan_dir/checksums.txt"
+          (cd "$scan_dir" && grep " $archive\$" checksums.txt | sha256sum -c -)
+          tar -xzf "$scan_dir/$archive" -C "$scan_dir" gitleaks
+          "$scan_dir/gitleaks" git . --config .gitleaks.toml --log-opts="--all" --redact --exit-code 1
