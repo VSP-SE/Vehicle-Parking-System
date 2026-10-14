@@ -32,6 +32,9 @@ jobs:
         run: ruff check . || true
 
       - name: Run tests with coverage
+        # SQLite until the PostgreSQL service container lands (issue #13)
+        env:
+          VPS_TEST_SQLITE: '1'
         run: |
           if [ -d tests ] && [ -n "$(find tests -name 'test_*.py' -print -quit)" ]; then
             pytest --cov=. --cov-report=xml --cov-branch --junitxml=junit.xml
