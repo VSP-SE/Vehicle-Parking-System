@@ -27,7 +27,7 @@ Team 10, Section C.
 |---|---|
 | Version control | Git and GitHub |
 | Agile planning and bug tracking | GitHub Projects |
-| CI | GitHub Actions |
+| CI | GitHub Actions: ruff, PostgreSQL tests, coverage gates and security scans |
 | Testing | pytest with branch coverage |
 
 ## Deliverables
@@ -66,6 +66,43 @@ pytest
 The database user needs permission to create the test database for PostgreSQL
 tests. To run tests without PostgreSQL, use `VPS_TEST_SQLITE=1 pytest`.
 
+### With Docker Compose
+
+Install Docker with the Compose plugin, then copy the example environment file:
+
+```sh
+cp .env.example .env
+```
+
+Edit `.env` with a generated Django secret key and a local database password,
+then start the services:
+
+```sh
+docker compose up --build
+```
+
+Open http://localhost:8000/healthz to check the application and database.
+The web service runs migrations before starting Django, and source changes reload
+automatically. PostgreSQL data stays in a named volume. On first initialization,
+the database gets `btree_gist` in the application database and `template1` so
+new test databases also have the extension.
+
+To run tests from the host, install `requirements-dev.txt` in the virtual
+environment as above, then start the Compose database and export `.env`:
+
+```sh
+docker compose up -d db
+# Wait for db to be healthy in docker compose ps before running tests.
+set -a
+source .env
+set +a
+export POSTGRES_HOST=localhost
+.venv/bin/pytest -q
+```
+
+Stop the services with `docker compose down`. To reset the database, use
+`docker compose down -v`; this removes the named volume and its data.
+
 ## Status
 
-Sprint 1 is under way. The Django project skeleton is in place, and CI runs on GitHub Actions for every push and pull request.
+Sprint 1 is under way. The Django project skeleton is in place. CI runs ruff, the test suite on PostgreSQL 16 with a 70% line and 60% branch coverage gate, pip-audit and a Gitleaks secret scan on every pull request.
