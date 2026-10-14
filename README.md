@@ -9,7 +9,7 @@ Team 10, Section C.
 
 | Name | SRN | GitHub |
 |---|---|---|
-| Harikrishnan D | PES1UG24CS136 | [@dhkrish06](https://github.com/dhkrish06) |
+|D Harikrishnan  | PES1UG24CS136 | [@dhkrish06](https://github.com/dhkrish06) |
 | Dhruv Purushotham Raju | PES1UG24CS154 | [@dhruvpurushotham1718-ui](https://github.com/dhruvpurushotham1718-ui) |
 | A Gitanjali | PES1UG24CS170 | [@git17616](https://github.com/git17616) |
 | Vivian Sobers E | PES1UG24CS901 | [@VivianSobers](https://github.com/VivianSobers) |
