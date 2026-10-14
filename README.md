@@ -42,6 +42,30 @@ Part 1 deliverables are in [`docs/part-1/`](docs/part-1/) as Word files:
 
 The UML diagrams are in [`docs/part-1/diagrams/`](docs/part-1/diagrams/) as PlantUML sources with rendered PNGs.
 
+## Running locally
+
+Use Python 3.12 or newer and a local PostgreSQL 16 database. Create the database
+and user, then set their credentials in `.env` along with a generated Django
+secret key. Django reads exported environment variables; it does not load `.env`
+automatically. The example file uses shell-compatible values.
+
+```sh
+python3.13 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements-dev.txt
+cp .env.example .env
+# Edit .env with your local values, then export them into the shell.
+set -a
+source .env
+set +a
+python manage.py migrate
+python manage.py runserver
+pytest
+```
+
+The database user needs permission to create the test database for PostgreSQL
+tests. To run tests without PostgreSQL, use `VPS_TEST_SQLITE=1 pytest`.
+
 ## Status
 
-The project is at the requirements stage. CI runs on GitHub Actions, but no application code has been written yet.
+Sprint 1 is under way. The Django project skeleton is in place, and CI runs on GitHub Actions for every push and pull request.
