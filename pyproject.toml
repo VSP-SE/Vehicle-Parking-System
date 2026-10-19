@@ -11,3 +11,6 @@ omit = ["*/migrations/*"]
 line-length = 100
 target-version = "py312"
 extend-exclude = ["**/migrations/**"]
+
+[tool.ruff.lint.per-file-ignores]
+"vps/**/models.py" = ["RUF012"]
