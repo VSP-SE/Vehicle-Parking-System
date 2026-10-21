@@ -1,22 +1,118 @@
 <!doctype html>
-<!-- Placeholder to be replaced by issue #17. -->
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}VPS{% endblock %}</title>
+
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+
   <style>
-    body { font-family: sans-serif; max-width: 70rem; margin: auto; padding: 1rem; }
-    header, .message { padding: 1rem; background: #eef4ef; margin-bottom: 1rem; }
-    th, td { text-align: left; padding: .5rem; } .errorlist { color: #a11212; }
-    .field { margin-bottom: 1rem; } form.inline { display: inline; }
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0 auto;
+      padding: 1rem;
+      max-width: 70rem;
+      font-family: system-ui, sans-serif;
+      line-height: 1.5;
+      color: #17251d;
+      background: #f8faf8;
+    }
+
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      background: #e5eee7;
+      border-radius: .5rem;
+    }
+
+    .brand { font-size: 1.2rem; font-weight: 700; }
+    .user-info { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; }
+
+    a, button { color: #14532d; }
+    a { overflow-wrap: anywhere; }
+
+    button, .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 44px;
+      min-height: 44px;
+      padding: .65rem .9rem;
+      border: 1px solid #24643b;
+      border-radius: .35rem;
+      font: inherit;
+      cursor: pointer;
+    }
+
+    button:focus-visible, a:focus-visible {
+      outline: 3px solid #2563eb;
+      outline-offset: 3px;
+    }
+
+    .message {
+      padding: .85rem 1rem;
+      margin-bottom: 1rem;
+      border: 1px solid;
+      border-radius: .35rem;
+      overflow-wrap: anywhere;
+    }
+
+    .message-success { color: #14532d; background: #dcfce7; border-color: #86efac; }
+    .message-error { color: #991b1b; background: #fee2e2; border-color: #fca5a5; }
+    .message-warning { color: #854d0e; background: #fef3c7; border-color: #fcd34d; }
+    .message-info { color: #1e40af; background: #dbeafe; border-color: #93c5fd; }
+
+    main { min-width: 0; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: .65rem; border-bottom: 1px solid #d1d5db; }
+    .errorlist { color: #a11212; }
+    .field { margin-bottom: 1rem; }
+    form.inline { display: inline; }
+
+    input, select, textarea {
+      max-width: 100%;
+      min-height: 44px;
+      padding: .5rem;
+      font: inherit;
+    }
+
+    @media (max-width: 480px) {
+      body { padding: .5rem; }
+      header { align-items: flex-start; flex-direction: column; }
+      .user-info { align-items: flex-start; flex-direction: column; }
+      table { display: block; overflow-x: auto; }
+    }
   </style>
 </head>
 <body>
-  <header>Vehicle Parking System
-    {% if user.is_authenticated %} — {{ user.email }} ({{ user.get_role_display }}){% endif %}
+  <header>
+    <div class="brand">Vehicle Parking System</div>
+    {% if user.is_authenticated %}
+      <div class="user-info">
+        <span>{{ user.email }} ({{ user.get_role_display }})</span>
+        {% block sign_out %}{% endblock %}
+      </div>
+    {% endif %}
   </header>
-  {% for message in messages %}<div class="message" role="status">{{ message }}</div>{% endfor %}
-  <main>{% block content %}{% endblock %}</main>
+
+  {% for message in messages %}
+    <div
+      class="message message-{{ message.tags|default:'info' }}"
+      {% if 'error' in message.tags %}role="alert"{% else %}role="status"{% endif %}
+      aria-live="{% if 'error' in message.tags %}assertive{% else %}polite{% endif %}">
+      {{ message }}
+    </div>
+  {% endfor %}
+
+  <main>
+    {% block content %}{% endblock %}
+  </main>
 </body>
 </html>
