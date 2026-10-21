@@ -61,22 +61,14 @@ def test_environment_values_reach_django_settings(monkeypatch):
 
 def test_all_ten_apps_installed(settings):
     for name in (
-        "accounts",
-        "vehicles",
-        "lots",
-        "reservations",
-        "allocation",
-        "gate",
-        "billing",
-        "reports",
-        "audit",
-        "notifications",
+        "accounts", "vehicles", "lots", "reservations", "allocation",
+        "gate", "billing", "reports", "audit", "notifications",
     ):
         assert apps.is_installed(f"vps.{name}")
         assert apps.get_app_config(name).default_auto_field == "django.db.models.BigAutoField"
     assert apps.is_installed("django.contrib.postgres")
     assert apps.is_installed("rest_framework")
-    assert settings.AUTH_USER_MODEL == "accounts.User"
+    assert settings.AUTH_USER_MODEL == "auth.User"
     assert settings.TIME_ZONE == "Asia/Kolkata"
     assert settings.USE_TZ is True
 
