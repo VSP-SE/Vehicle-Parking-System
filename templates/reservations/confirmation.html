@@ -1,0 +1,99 @@
+
+{% extends "base.html" %}
+
+{% block title %}Booking Confirmation | Vehicle Parking System{% endblock %}
+
+{% block content %}
+<section class="booking-page" aria-labelledby="booking-heading">
+  {% if booking_reference and slot_code %}
+    <div class="booking-card booking-success">
+      <div class="booking-icon" aria-hidden="true">&#10003;</div>
+      <h1 id="booking-heading">Booking Confirmed!</h1>
+      <p>Your parking reservation has been successfully confirmed.</p>
+
+      <div class="booking-detail">
+        <span>Booking reference</span>
+        <strong>{{ booking_reference }}</strong>
+      </div>
+
+      <div class="booking-detail">
+        <span>Parking slot</span>
+        <strong>{{ slot_code }}</strong>
+      </div>
+
+      {% if lot_name %}
+        <div class="booking-detail">
+          <span>Parking lot</span>
+          <strong>{{ lot_name }}</strong>
+        </div>
+      {% endif %}
+
+      <p class="booking-note">
+        Keep your booking reference handy when you arrive.
+      </p>
+
+      <a class="booking-button" href="{% url 'reservations:search' %}">
+        Back to parking search
+      </a>
+    </div>
+
+  {% else %}
+    <div class="booking-card">
+      <h1 id="booking-heading">Confirm Your Booking</h1>
+      <p>Review your parking selection before confirming your reservation.</p>
+
+      {% if booking_error %}
+        <div class="message message-error" role="alert">
+          {{ booking_error }}
+        </div>
+      {% endif %}
+
+      {% if lot_name %}
+        <div class="booking-detail">
+          <span>Parking lot</span>
+          <strong>{{ lot_name }}</strong>
+        </div>
+      {% endif %}
+
+      {% if vehicle_registration %}
+        <div class="booking-detail">
+          <span>Vehicle registration</span>
+          <strong>{{ vehicle_registration }}</strong>
+        </div>
+      {% endif %}
+
+      {% if start and end %}
+        <div class="booking-detail">
+          <span>Start</span>
+          <strong>{{ start }}</strong>
+        </div>
+        <div class="booking-detail">
+          <span>End</span>
+          <strong>{{ end }}</strong>
+        </div>
+      {% endif %}
+
+      {% if confirm_url %}
+        <form method="post" action="{{ confirm_url }}">
+          {% csrf_token %}
+          <button type="submit" class="booking-button">
+            Confirm Booking
+          </button>
+        </form>
+      {% else %}
+        <p class="booking-note" role="status">
+          Booking confirmation will be available once the reservation
+          service is connected.
+        </p>
+        <button type="button" class="booking-button" disabled>
+          Confirm Booking
+        </button>
+      {% endif %}
+
+      <a class="booking-back" href="{% url 'reservations:search' %}">
+        Back to parking search
+      </a>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}
