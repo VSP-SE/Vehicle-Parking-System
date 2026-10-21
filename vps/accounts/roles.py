@@ -1,12 +1,13 @@
-"""Group-backed roles and the SRS Appendix B.3 permission matrix."""
+"""Roles and the SRS Appendix B.3 permission matrix.
+
+Each user has exactly one role, stored in ``User.role`` (FR-AUTH-03).
+"""
 
 from enum import StrEnum
 
+from vps.accounts.models import User
 
-class Role(StrEnum):
-    DRIVER = "Driver"
-    GATE_ATTENDANT = "Gate Attendant"
-    LOT_ADMINISTRATOR = "Lot Administrator"
+Role = User.Role
 
 
 class Function(StrEnum):
@@ -23,26 +24,26 @@ class Function(StrEnum):
 
 PERMISSIONS: dict[Function, set[Role]] = {
     Function.MANAGE_OWN_VEHICLES: {Role.DRIVER},
-    Function.SEARCH: {Role.DRIVER, Role.GATE_ATTENDANT, Role.LOT_ADMINISTRATOR},
+    Function.SEARCH: {Role.DRIVER, Role.ATTENDANT, Role.ADMIN},
     Function.OWN_RESERVATIONS: {Role.DRIVER},
-    Function.GATE_OPERATIONS: {Role.GATE_ATTENDANT},
-    Function.CORRECT_TIMES: {Role.GATE_ATTENDANT, Role.LOT_ADMINISTRATOR},
-    Function.MANAGE_LOTS: {Role.LOT_ADMINISTRATOR},
-    Function.MANAGE_STAFF: {Role.LOT_ADMINISTRATOR},
-    Function.REPORTS: {Role.LOT_ADMINISTRATOR},
+    Function.GATE_OPERATIONS: {Role.ATTENDANT},
+    Function.CORRECT_TIMES: {Role.ATTENDANT, Role.ADMIN},
+    Function.MANAGE_LOTS: {Role.ADMIN},
+    Function.MANAGE_STAFF: {Role.ADMIN},
+    Function.REPORTS: {Role.ADMIN},
 }
 
 
 def user_roles(user) -> set[Role]:
-    """Return recognized groups only for authenticated, active users."""
+    """Return the user's role, or nothing for anonymous, inactive or unknown-role users."""
     if not user.is_authenticated or not user.is_active:
         return set()
-    return {
-        Role(name)
-        for name in user.groups.filter(name__in=Role).values_list("name", flat=True)
-    }
+    try:
+        return {Role(user.role)}
+    except ValueError:
+        return set()
 
 
 def can(user, function: Function) -> bool:
-    """Check a function against group membership, without privileged bypasses."""
+    """Check a function against the user's role, without privileged bypasses."""
     return bool(user_roles(user) & PERMISSIONS[function])

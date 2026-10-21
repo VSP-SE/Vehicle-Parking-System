@@ -1,7 +1,6 @@
 import logging
 
 import pytest
-from django.contrib.auth.models import Group
 from django.http import HttpResponse
 from django.urls import path
 from rest_framework.response import Response
@@ -32,7 +31,7 @@ class UnconfiguredView(RoleView):
 
 
 urlpatterns = [
-    path("protected/", role_required(Role.DRIVER, Role.GATE_ATTENDANT)(protected)),
+    path("protected/", role_required(Role.DRIVER, Role.ATTENDANT)(protected)),
     path("reports/", function_required(Function.REPORTS)(protected)),
     path("api/", RoleView.as_view()),
     path("api-unconfigured/", UnconfiguredView.as_view()),
@@ -41,26 +40,30 @@ urlpatterns = [
 
 @pytest.fixture
 def user(django_user_model):
-    return django_user_model.objects.create_user(username="viewer", password=PASSWORD)
+    return django_user_model.objects.create_user(
+        email="viewer@example.com", password=PASSWORD, role=Role.ADMIN
+    )
+
+
+def set_role(user, role):
+    user.role = role
+    user.save()
 
 
 def security_records(caplog):
     return [r for r in caplog.records if r.name == "vps.security"]
 
 
-@pytest.mark.parametrize("role", ["Driver", "Gate Attendant"])
+@pytest.mark.parametrize("role", [Role.DRIVER, Role.ATTENDANT])
 def test_decorator_allows_role(client, user, role, caplog):
-    user.groups.add(Group.objects.get(name=role))
+    set_role(user, role)
     client.force_login(user)
     with caplog.at_level(logging.WARNING, logger="vps.security"):
         assert client.get("/protected/").status_code == 200
     assert not security_records(caplog)
 
 
-@pytest.mark.parametrize("role", [None, "Lot Administrator"])
-def test_decorator_denies_and_logs_once(client, user, role, caplog):
-    if role:
-        user.groups.add(Group.objects.get(name=role))
+def test_decorator_denies_and_logs_once(client, user, caplog):
     client.force_login(user)
     with caplog.at_level(logging.WARNING, logger="vps.security"):
         response = client.post("/protected/", {"password": PASSWORD})
@@ -69,7 +72,7 @@ def test_decorator_denies_and_logs_once(client, user, role, caplog):
     assert len(records) == 1
     assert records[0].levelno == logging.WARNING
     message = records[0].getMessage()
-    for value in (str(user.pk), "POST", "/protected/", "Driver", "Gate Attendant"):
+    for value in (str(user.pk), "POST", "/protected/", "Driver", "Attendant"):
         assert value in message
     assert PASSWORD not in message
     assert user.password not in message
@@ -85,9 +88,9 @@ def test_anonymous_redirects_without_logging(client, settings, caplog):
     assert not security_records(caplog)
 
 
-@pytest.mark.parametrize("role,status", [("Driver", 403), ("Lot Administrator", 200)])
+@pytest.mark.parametrize("role,status", [(Role.DRIVER, 403), (Role.ADMIN, 200)])
 def test_function_required_uses_matrix(client, user, role, status):
-    user.groups.add(Group.objects.get(name=role))
+    set_role(user, role)
     client.force_login(user)
     assert client.get("/reports/").status_code == status
 
@@ -99,7 +102,7 @@ def test_bad_decoration_raises(roles):
 
 
 def test_decorator_preserves_metadata():
-    wrapped = role_required("Driver")(protected)
+    wrapped = role_required(Role.DRIVER)(protected)
     assert wrapped.__wrapped__ is protected
     assert wrapped.__name__ == protected.__name__
     assert wrapped.__doc__ == protected.__doc__
@@ -107,12 +110,12 @@ def test_decorator_preserves_metadata():
 
 @pytest.mark.parametrize(
     "role,url,status,log_count",
-    [("Driver", "/api/", 200, 0), ("Gate Attendant", "/api/", 403, 1),
-     (None, "/api/", 403, 0), ("Driver", "/api-unconfigured/", 403, 1)],
+    [(Role.DRIVER, "/api/", 200, 0), (Role.ATTENDANT, "/api/", 403, 1),
+     (None, "/api/", 403, 0), (Role.DRIVER, "/api-unconfigured/", 403, 1)],
 )
 def test_drf_role_permission(client, user, role, url, status, log_count, caplog):
     if role:
-        user.groups.add(Group.objects.get(name=role))
+        set_role(user, role)
         client.force_login(user)
     with caplog.at_level(logging.WARNING, logger="vps.security"):
         response = client.get(url)
@@ -132,7 +135,7 @@ def test_drf_role_permission(client, user, role, url, status, log_count, caplog)
 def test_inactive_user_denied_by_both_permission_interfaces(user, rf, caplog):
     from django.core.exceptions import PermissionDenied
 
-    user.groups.add(Group.objects.get(name="Driver"))
+    set_role(user, Role.DRIVER)
     user.is_active = False
     user.save()
     request = rf.get("/protected/")
@@ -145,7 +148,7 @@ def test_inactive_user_denied_by_both_permission_interfaces(user, rf, caplog):
 
 
 def test_drf_without_role_declaration_denies(user, rf, caplog):
-    user.groups.add(Group.objects.get(name="Driver"))
+    set_role(user, Role.DRIVER)
     request = rf.get("/api/")
     request.user = user
     with caplog.at_level(logging.WARNING, logger="vps.security"):
