@@ -3,11 +3,19 @@ from django.contrib.postgres.fields import DateTimeRangeField, RangeOperators
 from django.db import models
 
 
+class LotQuerySet(models.QuerySet):
+    def active(self):
+        return self.filter(is_archived=False)
+
+
 class Lot(models.Model):
     name = models.CharField(max_length=80)
     address = models.CharField(max_length=200)
     opens_at = models.TimeField()
     closes_at = models.TimeField()
+    is_archived = models.BooleanField(default=False)
+
+    objects = LotQuerySet.as_manager()
 
     class Meta:
         ordering = ["name"]
