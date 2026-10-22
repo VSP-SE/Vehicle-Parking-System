@@ -1,0 +1,51 @@
+
+{% extends "base.html" %}
+
+{% block title %}Sign In | Vehicle Parking System{% endblock %}
+
+{% block content %}
+<section class="auth-page" aria-labelledby="login-heading">
+  <div class="auth-card">
+    <h1 id="login-heading">Welcome back</h1>
+    <p class="auth-intro">Sign in to manage your parking reservations.</p>
+
+    {% if login_error %}
+      <div class="message message-error" role="alert">
+        {{ login_error }}
+      </div>
+    {% endif %}
+
+    <form method="post" class="auth-form">
+      {% csrf_token %}
+
+      <div class="field">
+        <label for="email">Email address</label>
+        <input
+          id="email"
+          name="email"
+          type="email"
+          maxlength="254"
+          autocomplete="username"
+          value="{{ email|default:'' }}"
+          required>
+      </div>
+
+      <div class="field">
+        <label for="password">Password</label>
+        <input
+          id="password"
+          name="password"
+          type="password"
+          autocomplete="current-password"
+          required>
+      </div>
+
+      <button type="submit" class="auth-button">Sign In</button>
+    </form>
+
+    <p class="auth-footnote">
+      Enter your registered e-mail address and password to continue.
+    </p>
+  </div>
+</section>
+{% endblock %}

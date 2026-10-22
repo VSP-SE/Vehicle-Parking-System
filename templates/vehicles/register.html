@@ -1,0 +1,87 @@
+
+{% extends "base.html" %}
+
+{% block title %}Add a Vehicle | Vehicle Parking System{% endblock %}
+
+{% block content %}
+<section class="vehicle-page" aria-labelledby="vehicle-heading">
+  <div class="vehicle-card">
+    <h1 id="vehicle-heading">Add a vehicle</h1>
+    <p class="vehicle-intro">
+      Register your vehicle to book suitable parking slots.
+    </p>
+
+    {% if vehicle_error %}
+      <div class="message message-error" role="alert">
+        {{ vehicle_error }}
+      </div>
+    {% endif %}
+
+    {% if vehicle_count is not None %}
+      <p class="vehicle-count" role="status">
+        {{ vehicle_count }} of 5 vehicles registered.
+      </p>
+    {% endif %}
+
+    {% if vehicle_limit_reached %}
+      <div class="message message-warning" role="status">
+        You have reached the maximum of 5 vehicles.
+      </div>
+    {% else %}
+      <form method="post" class="vehicle-form">
+        {% csrf_token %}
+
+        <div class="field">
+          <label for="registration_no">Registration number</label>
+          <input
+            id="registration_no"
+            name="registration_no"
+            type="text"
+            maxlength="13"
+            pattern="([A-Za-z]{2}[0-9]{2}[A-Za-z]{1,2}[0-9]{4}|[0-9]{2}[Bb][Hh][0-9]{4}[A-Za-z]{1,2})"
+            value="{{ registration_no|default:'' }}"
+            placeholder="KA01AB1234"
+            autocapitalize="characters"
+            spellcheck="false"
+            title="Enter a standard Indian number such as KA01AB1234 or Bharat series such as 22BH1234AA."
+            aria-describedby="registration-help"
+            required>
+          <small id="registration-help">
+            Example: KA01AB1234 or 22BH1234AA. Spaces will be removed when saved.
+          </small>
+        </div>
+
+        <div class="field">
+          <label for="vehicle_type">Vehicle type</label>
+          <select id="vehicle_type" name="vehicle_type" required>
+            <option value="">Choose vehicle type</option>
+            <option value="Car" {% if vehicle_type == "Car" %}selected{% endif %}>
+              Car
+            </option>
+            <option value="TwoWheeler" {% if vehicle_type == "TwoWheeler" %}selected{% endif %}>
+              Two-wheeler
+            </option>
+            <option value="EV" {% if vehicle_type == "EV" %}selected{% endif %}>
+              Electric car
+            </option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="nickname">Nickname <span>(optional)</span></label>
+          <input
+            id="nickname"
+            name="nickname"
+            type="text"
+            maxlength="30"
+            value="{{ nickname|default:'' }}"
+            placeholder="e.g. My daily ride">
+          <small>Maximum 30 characters.</small>
+        </div>
+
+        <button type="submit" class="vehicle-button">Add Vehicle</button>
+      </form>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}
