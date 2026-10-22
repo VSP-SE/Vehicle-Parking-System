@@ -5,8 +5,6 @@ from django.db import IntegrityError, transaction
 
 from vps.lots.models import Lot, Slot
 
-
-
 DUPLICATE_MESSAGE = "A parking lot with this name and address already exists. Change either field."
 REQUIRED_MESSAGES = {
     "name": "Enter a name for the parking lot.",
