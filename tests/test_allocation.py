@@ -1,4 +1,4 @@
-"""FR-ALLOC-01 + FR-ALLOC-02 – Slot eligibility and deterministic choice."""
+"""FR-ALLOC-01 + FR-ALLOC-02 + FR-ALLOC-03 – Slot eligibility, choice and retry."""
 
 from datetime import time
 
@@ -6,6 +6,7 @@ import pytest
 
 from vps.accounts.models import User
 from vps.allocation.services import (
+    allocate_slot_with_retry,
     choose_best_slot,
     eligible_slot_types,
     is_slot_eligible,
@@ -51,7 +52,7 @@ def make_vehicle():
     return _make
 
 
-# ---------- Eligibility tests (from #36) ----------
+# ---------- Eligibility (#36) ----------
 
 def test_two_wheeler_only_two_wheeler_slots(make_slot, make_vehicle):
     vehicle = make_vehicle(Vehicle.VehicleType.TWO_WHEELER)
@@ -77,23 +78,82 @@ def test_ev_can_use_ev_and_standard(make_slot, make_vehicle):
     assert is_slot_eligible(std, vehicle) is True
 
 
-# ---------- Deterministic choice tests (#37) ----------
+# ---------- Deterministic choice (#37) ----------
 
 def test_choose_best_slot_prefers_type_then_rank_then_code(make_slot, make_vehicle):
     vehicle = make_vehicle(Vehicle.VehicleType.EV)
-
-    # Create slots out of order on purpose
     s_far = make_slot("S9", Slot.SlotType.STANDARD, rank=5)
     e_far = make_slot("E9", Slot.SlotType.EV, rank=5)
     e_near = make_slot("E1", Slot.SlotType.EV, rank=1)
     s_near = make_slot("S1", Slot.SlotType.STANDARD, rank=1)
-    e_near_b = make_slot("E2", Slot.SlotType.EV, rank=1)  # same rank, higher code
+    e_near_b = make_slot("E2", Slot.SlotType.EV, rank=1)
 
-    candidates = [s_far, e_far, e_near_b, s_near, e_near]
-    best = choose_best_slot(candidates, vehicle)
-
-    # Should pick the nearest EV with the lowest code
+    best = choose_best_slot([s_far, e_far, e_near_b, s_near, e_near], vehicle)
     assert best == e_near
+
+
+def test_choose_best_slot_empty_list_returns_none(make_vehicle):
+    vehicle = make_vehicle(Vehicle.VehicleType.CAR)
+    assert choose_best_slot([], vehicle) is None
+
+
+# ---------- Retry logic (#38) ----------
+
+def test_allocate_succeeds_on_first_try(make_slot, make_vehicle):
+    vehicle = make_vehicle(Vehicle.VehicleType.EV)
+    e1 = make_slot("E1", Slot.SlotType.EV, rank=1)
+    e2 = make_slot("E2", Slot.SlotType.EV, rank=2)
+
+    def try_book(slot):
+        return True
+
+    result = allocate_slot_with_retry([e2, e1], vehicle, try_book)
+    assert result == e1
+
+
+def test_allocate_retries_when_first_slot_is_taken(make_slot, make_vehicle):
+    vehicle = make_vehicle(Vehicle.VehicleType.EV)
+    e1 = make_slot("E1", Slot.SlotType.EV, rank=1)
+    e2 = make_slot("E2", Slot.SlotType.EV, rank=2)
+
+    attempts = []
+
+    def try_book(slot):
+        attempts.append(slot.code)
+        return slot.code == "E2"
+
+    result = allocate_slot_with_retry([e1, e2], vehicle, try_book)
+    assert result == e2
+    assert attempts == ["E1", "E2"]
+
+
+def test_allocate_gives_up_after_three_attempts(make_slot, make_vehicle):
+    vehicle = make_vehicle(Vehicle.VehicleType.CAR)
+    slots = [
+        make_slot("S1", Slot.SlotType.STANDARD, rank=1),
+        make_slot("S2", Slot.SlotType.STANDARD, rank=2),
+        make_slot("S3", Slot.SlotType.STANDARD, rank=3),
+        make_slot("S4", Slot.SlotType.STANDARD, rank=4),
+    ]
+
+    attempts = []
+
+    def try_book(slot):
+        attempts.append(slot.code)
+        return False
+
+    result = allocate_slot_with_retry(slots, vehicle, try_book)
+    assert result is None
+    assert attempts == ["S1", "S2", "S3"]
+
+
+def test_allocate_returns_none_when_no_candidates(make_vehicle):
+    vehicle = make_vehicle(Vehicle.VehicleType.CAR)
+
+    def try_book(slot):
+        return True
+
+    assert allocate_slot_with_retry([], vehicle, try_book) is None
 
 
 def test_choose_best_slot_falls_back_to_standard_for_ev(make_slot, make_vehicle):
@@ -102,7 +162,7 @@ def test_choose_best_slot_falls_back_to_standard_for_ev(make_slot, make_vehicle)
     s2 = make_slot("S2", Slot.SlotType.STANDARD, rank=2)
 
     best = choose_best_slot([s2, s1], vehicle)
-    assert best == s1  # lowest rank
+    assert best == s1
 
 
 def test_choose_best_slot_for_car_prefers_standard(make_slot, make_vehicle):
@@ -111,12 +171,7 @@ def test_choose_best_slot_for_car_prefers_standard(make_slot, make_vehicle):
     std = make_slot("S5", Slot.SlotType.STANDARD, rank=3)
 
     best = choose_best_slot([acc, std], vehicle)
-    assert best == std  # Standard preferred over Accessible
-
-
-def test_choose_best_slot_empty_list_returns_none(make_vehicle):
-    vehicle = make_vehicle(Vehicle.VehicleType.CAR)
-    assert choose_best_slot([], vehicle) is None
+    assert best == std
 
 
 def test_car_standard_always_allowed(make_slot, make_vehicle):

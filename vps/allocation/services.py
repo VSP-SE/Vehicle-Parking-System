@@ -1,14 +1,13 @@
-"""The allocation module's business rules live here."""
-"""Slot eligibility and allocation business rules (FR-ALLOC-01, FR-ALLOC-02)."""
+"""Slot eligibility, choice and retry logic (FR-ALLOC-01, 02, 03)."""
 
 from vps.lots.models import Slot
 from vps.vehicles.models import Vehicle
 
+MAX_ALLOCATION_ATTEMPTS = 3
+
 
 def is_slot_eligible(slot: Slot, vehicle: Vehicle) -> bool:
-    """
-    Return True if the given slot is allowed for the vehicle under FR-ALLOC-01.
-    """
+    """Return True if the slot is allowed for the vehicle (FR-ALLOC-01)."""
     vehicle_type = vehicle.vehicle_type
     slot_type = slot.slot_type
     has_permit = getattr(vehicle.owner, "accessible_permit", False)
@@ -45,7 +44,7 @@ def eligible_slot_types(vehicle: Vehicle) -> set[str]:
 
 
 def _type_preference(vehicle: Vehicle) -> list[str]:
-    """Return slot types in preferred order for this vehicle (FR-ALLOC-02)."""
+    """Return slot types in preferred order (FR-ALLOC-02)."""
     if vehicle.vehicle_type == Vehicle.VehicleType.TWO_WHEELER:
         return [Slot.SlotType.TWO_WHEELER]
 
@@ -63,23 +62,45 @@ def _type_preference(vehicle: Vehicle) -> list[str]:
 
 def choose_best_slot(slots: list[Slot], vehicle: Vehicle) -> Slot | None:
     """
-    From a list of already-eligible and free slots, choose the best one
-    according to FR-ALLOC-02:
-
-    1. Preferred slot type first
-    2. Lowest distance_rank
-    3. Lowest slot code
+    Choose the best slot according to FR-ALLOC-02:
+    preferred type → lowest distance_rank → lowest code.
     """
     if not slots:
         return None
 
     preference = _type_preference(vehicle)
-    # Build a ranking key: (type_priority, distance_rank, code)
+
     def sort_key(slot: Slot):
         try:
             type_rank = preference.index(slot.slot_type)
         except ValueError:
-            type_rank = 999  # should not happen if caller filtered correctly
+            type_rank = 999
         return (type_rank, slot.distance_rank, slot.code)
 
     return min(slots, key=sort_key)
+
+
+def allocate_slot_with_retry(
+    candidate_slots: list[Slot],
+    vehicle: Vehicle,
+    try_book,
+    max_attempts: int = MAX_ALLOCATION_ATTEMPTS,
+) -> Slot | None:
+    """
+    Try to book a slot, retrying with the next best candidate when a
+    concurrent booking wins the race (FR-ALLOC-03).
+    """
+    remaining = list(candidate_slots)
+
+    for _ in range(max_attempts):
+        best = choose_best_slot(remaining, vehicle)
+        if best is None:
+            return None
+
+        if try_book(best):
+            return best
+
+        # Slot was taken – remove it and try the next best
+        remaining = [s for s in remaining if s.pk != best.pk]
+
+    return None
