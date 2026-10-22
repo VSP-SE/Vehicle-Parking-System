@@ -7,6 +7,7 @@ import pytest
 from vps.accounts.models import User
 from vps.allocation.services import (
     choose_best_slot,
+    eligible_slot_types,
     is_slot_eligible,
 )
 from vps.lots.models import Lot, Slot
@@ -116,3 +117,29 @@ def test_choose_best_slot_for_car_prefers_standard(make_slot, make_vehicle):
 def test_choose_best_slot_empty_list_returns_none(make_vehicle):
     vehicle = make_vehicle(Vehicle.VehicleType.CAR)
     assert choose_best_slot([], vehicle) is None
+
+
+def test_car_standard_always_allowed(make_slot, make_vehicle):
+    vehicle = make_vehicle(Vehicle.VehicleType.CAR)
+    std = make_slot("S1", Slot.SlotType.STANDARD)
+    assert is_slot_eligible(std, vehicle) is True
+
+
+def test_car_never_gets_two_wheeler_or_ev(make_slot, make_vehicle):
+    vehicle = make_vehicle(Vehicle.VehicleType.CAR, accessible_permit=True)
+    tw = make_slot("T1", Slot.SlotType.TWO_WHEELER)
+    ev = make_slot("E1", Slot.SlotType.EV)
+
+    assert is_slot_eligible(tw, vehicle) is False
+    assert is_slot_eligible(ev, vehicle) is False
+
+
+def test_car_eligible_types_with_and_without_permit(make_vehicle):
+    no_permit = make_vehicle(Vehicle.VehicleType.CAR, accessible_permit=False)
+    with_permit = make_vehicle(Vehicle.VehicleType.CAR, accessible_permit=True)
+
+    assert eligible_slot_types(no_permit) == {Slot.SlotType.STANDARD}
+    assert eligible_slot_types(with_permit) == {
+        Slot.SlotType.STANDARD,
+        Slot.SlotType.ACCESSIBLE,
+    }
