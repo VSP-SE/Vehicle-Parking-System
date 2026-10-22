@@ -8,6 +8,7 @@ from vps.accounts.models import User
 from vps.allocation.services import (
     allocate_slot_with_retry,
     choose_best_slot,
+    eligible_slot_types,
     is_slot_eligible,
 )
 from vps.lots.models import Lot, Slot
@@ -153,3 +154,47 @@ def test_allocate_returns_none_when_no_candidates(make_vehicle):
         return True
 
     assert allocate_slot_with_retry([], vehicle, try_book) is None
+
+
+def test_choose_best_slot_falls_back_to_standard_for_ev(make_slot, make_vehicle):
+    vehicle = make_vehicle(Vehicle.VehicleType.EV)
+    s1 = make_slot("S1", Slot.SlotType.STANDARD, rank=1)
+    s2 = make_slot("S2", Slot.SlotType.STANDARD, rank=2)
+
+    best = choose_best_slot([s2, s1], vehicle)
+    assert best == s1
+
+
+def test_choose_best_slot_for_car_prefers_standard(make_slot, make_vehicle):
+    vehicle = make_vehicle(Vehicle.VehicleType.CAR, accessible_permit=True)
+    acc = make_slot("A1", Slot.SlotType.ACCESSIBLE, rank=1)
+    std = make_slot("S5", Slot.SlotType.STANDARD, rank=3)
+
+    best = choose_best_slot([acc, std], vehicle)
+    assert best == std
+
+
+def test_car_standard_always_allowed(make_slot, make_vehicle):
+    vehicle = make_vehicle(Vehicle.VehicleType.CAR)
+    std = make_slot("S1", Slot.SlotType.STANDARD)
+    assert is_slot_eligible(std, vehicle) is True
+
+
+def test_car_never_gets_two_wheeler_or_ev(make_slot, make_vehicle):
+    vehicle = make_vehicle(Vehicle.VehicleType.CAR, accessible_permit=True)
+    tw = make_slot("T1", Slot.SlotType.TWO_WHEELER)
+    ev = make_slot("E1", Slot.SlotType.EV)
+
+    assert is_slot_eligible(tw, vehicle) is False
+    assert is_slot_eligible(ev, vehicle) is False
+
+
+def test_car_eligible_types_with_and_without_permit(make_vehicle):
+    no_permit = make_vehicle(Vehicle.VehicleType.CAR, accessible_permit=False)
+    with_permit = make_vehicle(Vehicle.VehicleType.CAR, accessible_permit=True)
+
+    assert eligible_slot_types(no_permit) == {Slot.SlotType.STANDARD}
+    assert eligible_slot_types(with_permit) == {
+        Slot.SlotType.STANDARD,
+        Slot.SlotType.ACCESSIBLE,
+    }

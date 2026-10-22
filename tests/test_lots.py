@@ -278,3 +278,84 @@ def test_update_does_not_accept_archival_or_unknown_fields(lot):
         services.update_lot(lot, is_archived=True)
     lot.refresh_from_db()
     assert not lot.is_archived
+
+
+# ---------------------------------------------------------------------------
+# Slot creation – FR-LOT-02 / Issue #31
+# ---------------------------------------------------------------------------
+
+def test_create_slot_success(lot):
+    slot = services.create_slot(
+        lot=lot,
+        code=" a-01 ",
+        slot_type=Slot.SlotType.EV,
+        distance_rank=3,
+    )
+    assert slot.pk is not None
+    assert slot.code == "A-01"
+    assert slot.slot_type == Slot.SlotType.EV
+    assert slot.distance_rank == 3
+    assert slot.lot == lot
+
+
+def test_create_slot_normalises_code(lot):
+    slot = services.create_slot(
+        lot=lot, code="  b12 ", slot_type="Standard", distance_rank=1
+    )
+    assert slot.code == "B12"
+
+
+@pytest.mark.parametrize(
+    "slot_type",
+    [
+        Slot.SlotType.STANDARD,
+        Slot.SlotType.TWO_WHEELER,
+        Slot.SlotType.EV,
+        Slot.SlotType.ACCESSIBLE,
+    ],
+)
+def test_create_slot_all_types(lot, slot_type):
+    slot = services.create_slot(
+        lot=lot, code=f"T-{slot_type[:3]}", slot_type=slot_type, distance_rank=1
+    )
+    assert slot.slot_type == slot_type
+
+
+def test_create_slot_rejects_duplicate_code_in_same_lot(lot):
+    services.create_slot(lot=lot, code="C1", slot_type="Standard", distance_rank=1)
+    with pytest.raises(ValidationError) as exc:
+        services.create_slot(lot=lot, code="c1", slot_type="TwoWheeler", distance_rank=2)
+    assert "code" in exc.value.message_dict
+    assert "already exists" in str(exc.value)
+    assert Slot.objects.filter(lot=lot).count() == 1
+
+
+def test_create_slot_allows_same_code_in_different_lots(lot):
+    other = Lot.objects.create(
+        name="Other Lot", address="Other Road", opens_at=time(6), closes_at=time(22)
+    )
+    services.create_slot(lot=lot, code="X1", slot_type="Standard", distance_rank=1)
+    services.create_slot(lot=other, code="X1", slot_type="Standard", distance_rank=1)
+    assert Slot.objects.filter(code="X1").count() == 2
+
+
+@pytest.mark.parametrize("rank", [0, -1, -100])
+def test_create_slot_rejects_non_positive_distance_rank(lot, rank):
+    with pytest.raises(ValidationError) as exc:
+        services.create_slot(
+            lot=lot, code="D1", slot_type="Standard", distance_rank=rank
+        )
+    assert "distance_rank" in exc.value.message_dict
+
+
+def test_create_slot_rejects_empty_code(lot):
+    with pytest.raises(ValidationError) as exc:
+        services.create_slot(lot=lot, code="   ", slot_type="Standard", distance_rank=1)
+    assert "code" in exc.value.message_dict
+
+
+def test_create_slot_rejects_invalid_slot_type(lot):
+    with pytest.raises(ValidationError):
+        services.create_slot(
+            lot=lot, code="E1", slot_type="Truck", distance_rank=1
+        )
