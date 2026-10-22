@@ -8,8 +8,9 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_http_methods, require_POST, require_safe
 
 from vps.accounts import services
-from vps.accounts.forms import RegistrationForm, SignInForm
+from vps.accounts.forms import RegistrationForm, SignInForm, StaffRegistrationForm
 from vps.accounts.models import User
+from vps.accounts.permissions import role_required
 
 
 @require_http_methods(["GET", "POST"])
@@ -81,3 +82,31 @@ def home(request):
     if not request.user.is_active or request.user.role not in destinations:
         raise PermissionDenied
     return redirect(destinations[request.user.role])
+
+@role_required(User.Role.ADMIN)
+@require_http_methods(["GET", "POST"])
+def create_staff(request):
+    form = StaffRegistrationForm(
+        request.POST if request.method == "POST" else None
+    )
+
+    if request.method == "POST" and form.is_valid():
+        try:
+            staff = services.create_staff(**form.cleaned_data)
+        except ValidationError as error:
+            for field, errors in error.error_dict.items():
+                form.add_error(field, errors)
+        else:
+            from django.contrib import messages
+
+            messages.success(
+                request,
+                f"Staff account created for {staff.email}.",
+            )
+            return redirect("accounts:create_staff")
+
+    return render(
+        request,
+        "accounts/create_staff.html",
+        {"form": form},
+    )
