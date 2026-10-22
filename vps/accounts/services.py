@@ -47,3 +47,59 @@ def register_driver(*, full_name, email, mobile, password):
         ):
             raise ValidationError({"email": DUPLICATE_EMAIL}) from error
         raise
+
+def create_staff(*, full_name, email, mobile, password, role):
+    full_name = full_name.strip()
+    email = User.objects.normalize_email(email.strip())
+
+    if role not in (User.Role.ATTENDANT, User.Role.ADMIN):
+        raise ValidationError({
+            "role": "Only staff roles can be created here."
+        })
+
+    user = User(
+        full_name=full_name,
+        email=email,
+        mobile=mobile,
+        role=role,
+    )
+
+    errors = {}
+
+    try:
+        user.full_clean(
+            exclude=["password"],
+            validate_unique=False,
+            validate_constraints=False,
+        )
+    except ValidationError as error:
+        errors.update(error.message_dict)
+
+    if User.objects.filter(email=email).exists():
+        errors["email"] = [DUPLICATE_EMAIL]
+
+    try:
+        validate_password(password, user)
+    except ValidationError as error:
+        errors["password"] = error.messages
+
+    if errors:
+        raise ValidationError(errors)
+
+    try:
+        with transaction.atomic():
+            return User.objects.create_user(
+                email=email,
+                password=password,
+                full_name=full_name,
+                mobile=mobile,
+                role=role,
+            )
+    except IntegrityError as error:
+        if getattr(
+            getattr(error.__cause__, "diag", None),
+            "constraint_name",
+            None,
+        ) == "accounts_user_email_key":
+            raise ValidationError({"email": DUPLICATE_EMAIL}) from error
+        raise
