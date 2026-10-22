@@ -23,9 +23,7 @@ def is_slot_eligible(slot: Slot, vehicle: Vehicle) -> bool:
     if vehicle_type == Vehicle.VehicleType.CAR:
         if slot_type == Slot.SlotType.STANDARD:
             return True
-        if slot_type == Slot.SlotType.ACCESSIBLE and has_permit:
-            return True
-        return False
+        return slot_type == Slot.SlotType.ACCESSIBLE and has_permit
 
     if vehicle_type == Vehicle.VehicleType.EV:
         return slot_type in (Slot.SlotType.EV, Slot.SlotType.STANDARD)
