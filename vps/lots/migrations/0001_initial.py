@@ -3,6 +3,7 @@
 import django.contrib.postgres.constraints
 import django.contrib.postgres.fields.ranges
 import django.db.models.deletion
+from django.contrib.postgres.operations import BtreeGistExtension
 from django.db import migrations, models
 
 
@@ -14,6 +15,8 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        # The slot/period exclusion constraints need btree_gist (FR-RES-02).
+        BtreeGistExtension(),
         migrations.CreateModel(
             name='Lot',
             fields=[
