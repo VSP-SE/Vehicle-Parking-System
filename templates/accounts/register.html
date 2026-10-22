@@ -23,7 +23,7 @@
       </div>
     {% endif %}
 
-    <form method="post" class="registration-form">
+    <form method="post" action="{% url 'accounts:register' %}" class="registration-form">
       {% csrf_token %}
 
       <div class="field">
@@ -99,7 +99,7 @@
     </form>
 
     <p class="registration-footnote">
-      Already registered? Contact the site administrator for sign-in access.
+      Already registered? <a href="{% url 'accounts:login' %}">Sign in</a>.
     </p>
   </div>
 </section>

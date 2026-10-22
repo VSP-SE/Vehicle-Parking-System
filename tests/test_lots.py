@@ -124,7 +124,7 @@ def test_archive_restore_idempotent_and_active_queryset(lot):
 
 
 def test_list_hours_slots_and_placeholder_identity(admin_client, lot):
-    Slot.objects.create(lot=lot, code="A1")
+    Slot.objects.create(lot=lot, code="A1", distance_rank=1)
     response = admin_client.get("/lots/")
     assert response.status_code == 200
     html = response.content.decode()

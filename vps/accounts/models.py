@@ -36,8 +36,8 @@ class UserManager(BaseUserManager):
 class User(AbstractUser):
     class Role(models.TextChoices):
         DRIVER = "Driver", "Driver"
-        ATTENDANT = "Attendant", "Attendant"
-        ADMIN = "Admin", "Admin"
+        ATTENDANT = "Attendant", "Gate Attendant"
+        ADMIN = "Admin", "Lot Administrator"
 
     username = None
     email = models.EmailField(max_length=254, unique=True)

@@ -37,11 +37,17 @@ class Slot(models.Model):
     lot = models.ForeignKey(Lot, on_delete=models.PROTECT, related_name="slots")
     code = models.CharField(max_length=10)
     slot_type = models.CharField(max_length=12, choices=SlotType.choices, default=SlotType.STANDARD)
-    distance_rank = models.PositiveSmallIntegerField(default=0)
+    distance_rank = models.PositiveSmallIntegerField()
 
     class Meta:
         ordering = ["lot_id", "code"]
-        constraints = [models.UniqueConstraint(fields=["lot", "code"], name="slot_lot_code_uniq")]
+        constraints = [
+            models.UniqueConstraint(fields=["lot", "code"], name="slot_lot_code_uniq"),
+            # FR-LOT-02: a positive integer, 1 being nearest to the exit.
+            models.CheckConstraint(
+                condition=models.Q(distance_rank__gte=1), name="slot_distance_rank_positive"
+            ),
+        ]
         indexes = [models.Index(fields=["lot", "slot_type"], name="slot_lot_type_idx")]
 
     def __str__(self):
