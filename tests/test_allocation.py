@@ -7,7 +7,6 @@ import pytest
 from vps.accounts.models import User
 from vps.allocation.services import (
     choose_best_slot,
-    eligible_slot_types,
     is_slot_eligible,
 )
 from vps.lots.models import Lot, Slot
