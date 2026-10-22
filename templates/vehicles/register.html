@@ -28,7 +28,7 @@
         You have reached the maximum of 5 vehicles.
       </div>
     {% else %}
-      <form method="post" class="vehicle-form">
+      <form method="post" action="{% url 'vehicles:register' %}" class="vehicle-form">
         {% csrf_token %}
 
         <div class="field">
@@ -37,8 +37,6 @@
             id="registration_no"
             name="registration_no"
             type="text"
-            maxlength="13"
-            pattern="([A-Za-z]{2}[0-9]{2}[A-Za-z]{1,2}[0-9]{4}|[0-9]{2}[Bb][Hh][0-9]{4}[A-Za-z]{1,2})"
             value="{{ registration_no|default:'' }}"
             placeholder="KA01AB1234"
             autocapitalize="characters"
@@ -49,6 +47,7 @@
           <small id="registration-help">
             Example: KA01AB1234 or 22BH1234AA. Spaces will be removed when saved.
           </small>
+          {{ form.registration_no.errors }}
         </div>
 
         <div class="field">
@@ -65,6 +64,7 @@
               Electric car
             </option>
           </select>
+          {{ form.vehicle_type.errors }}
         </div>
 
         <div class="field">
@@ -77,10 +77,21 @@
             value="{{ nickname|default:'' }}"
             placeholder="e.g. My daily ride">
           <small>Maximum 30 characters.</small>
+          {{ form.nickname.errors }}
         </div>
 
         <button type="submit" class="vehicle-button">Add Vehicle</button>
       </form>
+    {% endif %}
+    {% if vehicles %}
+      <section aria-labelledby="your-vehicles-heading">
+        <h2 id="your-vehicles-heading">Your vehicles</h2>
+        <ul>
+          {% for vehicle in vehicles %}
+            <li>{{ vehicle.registration_no }} — {{ vehicle.get_vehicle_type_display }}{% if vehicle.nickname %} ({{ vehicle.nickname }}){% endif %}</li>
+          {% endfor %}
+        </ul>
+      </section>
     {% endif %}
   </div>
 </section>

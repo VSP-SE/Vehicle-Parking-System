@@ -9,6 +9,7 @@ from vps.views import healthz
 urlpatterns = [
     path("", home, name="home"),
     path("accounts/", include("vps.accounts.urls")),
+    path("vehicles/", include("vps.vehicles.urls")),
     path("lots/", include("vps.lots.urls")),
     path("reservations/", include("vps.reservations.urls")),
     path("admin/", admin.site.urls),
