@@ -1,1 +1,49 @@
-"""The accounts module's business rules live here."""
+"""Account registration rules shared by forms and other callers."""
+
+import re
+
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
+
+from vps.accounts.models import User
+
+DUPLICATE_EMAIL = "An account with this e-mail already exists"
+
+
+def register_driver(*, full_name, email, mobile, password):
+    full_name = full_name.strip()
+    email = User.objects.normalize_email(email.strip())
+    user = User(full_name=full_name, email=email, mobile=mobile, role=User.Role.DRIVER)
+    errors = {}
+    if not 2 <= len(full_name) <= 100:
+        errors["full_name"] = ["Enter a full name of 2 to 100 characters."]
+    if not re.fullmatch(r"[6-9][0-9]{9}", mobile):
+        errors["mobile"] = ["Enter 10 digits, starting with 6, 7, 8 or 9."]
+    try:
+        user.full_clean(exclude=["password"], validate_unique=False, validate_constraints=False)
+    except ValidationError as error:
+        errors.update(error.message_dict)
+    if User.objects.filter(email=email).exists():
+        errors["email"] = [DUPLICATE_EMAIL]
+    try:
+        validate_password(password, user)
+    except ValidationError as error:
+        errors["password"] = error.messages
+    if errors:
+        raise ValidationError(errors)
+    try:
+        with transaction.atomic():
+            return User.objects.create_user(
+                email,
+                password,
+                full_name=full_name,
+                mobile=mobile,
+                role=User.Role.DRIVER,
+            )
+    except IntegrityError as error:
+        if getattr(getattr(error.__cause__, "diag", None), "constraint_name", None) == (
+            "accounts_user_email_key"
+        ):
+            raise ValidationError({"email": DUPLICATE_EMAIL}) from error
+        raise

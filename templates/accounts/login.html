@@ -15,8 +15,9 @@
       </div>
     {% endif %}
 
-    <form method="post" class="auth-form">
+    <form method="post" action="{% url 'accounts:login' %}" class="auth-form">
       {% csrf_token %}
+      {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
 
       <div class="field">
         <label for="email">Email address</label>
