@@ -1,4 +1,5 @@
-"""Slot eligibility and allocation business rules (FR-ALLOC-01)."""
+"""The allocation module's business rules live here."""
+"""Slot eligibility and allocation business rules (FR-ALLOC-01, FR-ALLOC-02)."""
 
 from vps.lots.models import Slot
 from vps.vehicles.models import Vehicle
@@ -7,11 +8,6 @@ from vps.vehicles.models import Vehicle
 def is_slot_eligible(slot: Slot, vehicle: Vehicle) -> bool:
     """
     Return True if the given slot is allowed for the vehicle under FR-ALLOC-01.
-
-    Rules:
-    - Two-wheeler  → only TwoWheeler slots
-    - Car          → Standard slots, plus Accessible if the owner has a permit
-    - EV           → EV slots and Standard slots
     """
     vehicle_type = vehicle.vehicle_type
     slot_type = slot.slot_type
@@ -28,15 +24,11 @@ def is_slot_eligible(slot: Slot, vehicle: Vehicle) -> bool:
     if vehicle_type == Vehicle.VehicleType.EV:
         return slot_type in (Slot.SlotType.EV, Slot.SlotType.STANDARD)
 
-    # Unknown vehicle type is never eligible
     return False
 
 
 def eligible_slot_types(vehicle: Vehicle) -> set[str]:
-    """
-    Return the set of slot types that are allowed for this vehicle.
-    Useful for filtering querysets.
-    """
+    """Return the set of slot types allowed for this vehicle."""
     if vehicle.vehicle_type == Vehicle.VehicleType.TWO_WHEELER:
         return {Slot.SlotType.TWO_WHEELER}
 
@@ -50,3 +42,44 @@ def eligible_slot_types(vehicle: Vehicle) -> set[str]:
         return {Slot.SlotType.EV, Slot.SlotType.STANDARD}
 
     return set()
+
+
+def _type_preference(vehicle: Vehicle) -> list[str]:
+    """Return slot types in preferred order for this vehicle (FR-ALLOC-02)."""
+    if vehicle.vehicle_type == Vehicle.VehicleType.TWO_WHEELER:
+        return [Slot.SlotType.TWO_WHEELER]
+
+    if vehicle.vehicle_type == Vehicle.VehicleType.CAR:
+        order = [Slot.SlotType.STANDARD]
+        if getattr(vehicle.owner, "accessible_permit", False):
+            order.append(Slot.SlotType.ACCESSIBLE)
+        return order
+
+    if vehicle.vehicle_type == Vehicle.VehicleType.EV:
+        return [Slot.SlotType.EV, Slot.SlotType.STANDARD]
+
+    return []
+
+
+def choose_best_slot(slots: list[Slot], vehicle: Vehicle) -> Slot | None:
+    """
+    From a list of already-eligible and free slots, choose the best one
+    according to FR-ALLOC-02:
+
+    1. Preferred slot type first
+    2. Lowest distance_rank
+    3. Lowest slot code
+    """
+    if not slots:
+        return None
+
+    preference = _type_preference(vehicle)
+    # Build a ranking key: (type_priority, distance_rank, code)
+    def sort_key(slot: Slot):
+        try:
+            type_rank = preference.index(slot.slot_type)
+        except ValueError:
+            type_rank = 999  # should not happen if caller filtered correctly
+        return (type_rank, slot.distance_rank, slot.code)
+
+    return min(slots, key=sort_key)
