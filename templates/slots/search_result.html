@@ -1,0 +1,13 @@
+{% if search_error %}
+  <div class="message message-error" role="alert">
+    {{ search_error }}
+  </div>
+{% elif slot_count != None %}
+  <section class="search-result" aria-labelledby="results-heading">
+    <h2 id="results-heading">Parking availability</h2>
+    <p>
+      <strong>{{ slot_count }}</strong>
+      suitable slot{{ slot_count|pluralize }} available for your selected window.
+    </p>
+  </section>
+{% endif %}

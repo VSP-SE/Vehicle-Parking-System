@@ -89,6 +89,67 @@
       .user-info { align-items: flex-start; flex-direction: column; }
       table { display: block; overflow-x: auto; }
     }
+
+    .search-page {
+  max-width: 42rem;
+  margin: 1rem auto;
+}
+
+.search-intro {
+  margin-bottom: 1.5rem;
+}
+
+.search-form {
+  display: grid;
+  gap: 1rem;
+  padding: 1.25rem;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: .5rem;
+}
+
+.search-form .field {
+  display: grid;
+  gap: .4rem;
+  margin-bottom: 0;
+}
+
+.search-form select,
+.search-form input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #9ca3af;
+  border-radius: .35rem;
+}
+
+.search-form button {
+  width: 100%;
+  background: #166534;
+  color: #fff;
+}
+
+.search-result {
+  margin-top: 1.25rem;
+  padding: 1rem;
+  background: #dcfce7;
+  border-radius: .5rem;
+  overflow-wrap: anywhere;
+}
+
+.htmx-indicator {
+  display: none;
+}
+
+.htmx-request .htmx-indicator,
+.htmx-request.htmx-indicator {
+  display: inline;
+}
+
+@media (max-width: 480px) {
+  .search-form {
+    padding: .85rem;
+  }
+}
   </style>
 </head>
 <body>
