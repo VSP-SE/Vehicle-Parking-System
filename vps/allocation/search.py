@@ -1,13 +1,12 @@
 # vps/allocation/search.py
 
-from datetime import  timedelta
+from datetime import timedelta
 
 from django.utils import timezone
 
 from vps.allocation.services import is_slot_eligible
 from vps.lots.models import Slot
 from vps.reservations.models import Reservation
-
 
 MIN_WINDOW = timedelta(minutes=30)
 MAX_WINDOW = timedelta(hours=24)
