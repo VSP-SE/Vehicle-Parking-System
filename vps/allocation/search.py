@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from django.utils import timezone
 
 from vps.allocation.services import is_slot_eligible
-from vps.lots.models import Lot, Slot
+from vps.lots.models import Slot
 from vps.reservations.models import Reservation
 
 
