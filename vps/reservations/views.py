@@ -1,15 +1,14 @@
 """Presentation views for driver parking search and reservation."""
 
-from datetime import datetime
+
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404, redirect, render
-from django.utils import timezone
+
 from django.views.decorators.http import require_http_methods, require_POST
 
-from vps.accounts.models import User
 from vps.lots.models import Lot
 from vps.reservations.forms import ReservationConfirmForm
 from vps.reservations.models import Reservation
