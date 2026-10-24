@@ -1,5 +1,7 @@
 """Booking rules: slot search, limits (FR-RES-03) and race-safe reservation (FR-RES-01, 02)."""
 
+from datetime import timedelta
+
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, connection, transaction
 from django.db.backends.postgresql.psycopg_any import DateTimeTZRange
@@ -16,6 +18,34 @@ NO_SLOT = "No slot available for this window"
 LIMIT_REACHED = "You already have 2 open reservations. Cancel one before booking another."
 UNPAID_CHARGE = "You have an unpaid charge. Pay it before booking again."
 MAX_OPEN_RESERVATIONS = 2
+MIN_WINDOW = timedelta(minutes=30)
+MAX_WINDOW = timedelta(hours=24)
+MAX_START_AHEAD = timedelta(days=7)
+
+
+def validate_window(lot, start, end, now=None):
+    """FR-SRCH-02: refuse a window that breaks a rule, naming the rule."""
+    now = now or timezone.now()
+    if end <= start:
+        error = "The end time must be after the start time."
+    elif start < now:
+        error = "The start time cannot be in the past."
+    elif start > now + MAX_START_AHEAD:
+        error = "The start time cannot be more than 7 days ahead."
+    elif end - start < MIN_WINDOW:
+        error = "The parking window must be at least 30 minutes."
+    elif end - start > MAX_WINDOW:
+        error = "The parking window cannot exceed 24 hours."
+    else:
+        local_start, local_end = timezone.localtime(start), timezone.localtime(end)
+        if (
+            local_start.date() == local_end.date()
+            and lot.opens_at <= local_start.time()
+            and local_end.time() <= lot.closes_at
+        ):
+            return
+        error = f"The window must fall within the lot's opening hours ({lot.opens_at:%H:%M} to {lot.closes_at:%H:%M})."
+    raise ValidationError({"__all__": error})
 
 
 def free_slots(lot, vehicle, start, end):
@@ -85,6 +115,9 @@ def reserve(driver, vehicle, lot, start, end):
         raise ValidationError({"__all__": "Only Drivers may make reservations."})
     if vehicle.owner_id != driver.pk or not vehicle.is_active:
         raise ValidationError({"__all__": "Choose one of your registered vehicles."})
+    if lot.is_archived:
+        raise ValidationError({"__all__": "This parking lot is no longer taking bookings."})
+    validate_window(lot, start, end)
     period = DateTimeTZRange(start, end)
     booked = {}
     with transaction.atomic():
