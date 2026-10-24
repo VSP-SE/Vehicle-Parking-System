@@ -33,6 +33,8 @@
     }
 
     .brand { font-size: 1.2rem; font-weight: 700; }
+    .site-nav { display: flex; flex-wrap: wrap; gap: 1rem; }
+    .site-nav a { color: inherit; font-weight: 600; }
     .user-info { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; }
 
     a, button { color: #14532d; }
@@ -448,6 +450,16 @@
   <header>
     <div class="brand">Vehicle Parking System</div>
     {% if user.is_authenticated %}
+      <nav class="site-nav" aria-label="Main">
+        {% if user.role == "Driver" %}
+          <a href="{% url 'vehicles:register' %}">My vehicles</a>
+          <a href="{% url 'reservations:search' %}">Find parking</a>
+        {% elif user.role == "Admin" %}
+          <a href="{% url 'lots:list' %}">Parking lots</a>
+        {% elif user.role == "Attendant" %}
+          <a href="{% url 'reservations:search' %}">Slot search</a>
+        {% endif %}
+      </nav>
       <div class="user-info">
         <span>{{ user.email }} ({{ user.get_role_display }})</span>
         {% block sign_out %}
