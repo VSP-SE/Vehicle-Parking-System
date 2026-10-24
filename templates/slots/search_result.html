@@ -9,5 +9,15 @@
       <strong>{{ slot_count }}</strong>
       suitable slot{{ slot_count|pluralize }} available for your selected window.
     </p>
+    {% if confirm_url and slot_count %}
+      <form method="post" action="{{ confirm_url }}" class="booking-form">
+        {% csrf_token %}
+        <input type="hidden" name="lot" value="{{ selected_lot }}">
+        <input type="hidden" name="vehicle" value="{{ selected_vehicle }}">
+        <input type="hidden" name="start" value="{{ start }}">
+        <input type="hidden" name="end" value="{{ end }}">
+        <button type="submit">Book a slot</button>
+      </form>
+    {% endif %}
   </section>
 {% endif %}

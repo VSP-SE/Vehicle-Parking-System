@@ -3,7 +3,7 @@
 import re
 import threading
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, time
+from datetime import time, timedelta
 from decimal import Decimal
 
 import pytest
@@ -19,7 +19,8 @@ from vps.reservations import services
 from vps.reservations.models import Reservation
 from vps.vehicles.models import Vehicle
 
-START = timezone.make_aware(datetime(2026, 10, 23, 10, 0))
+# Tomorrow, so every window is in the future and inside the 7-day search horizon.
+START = timezone.localtime().replace(hour=10, minute=0, second=0, microsecond=0) + timedelta(days=1)
 
 
 def at(hour):

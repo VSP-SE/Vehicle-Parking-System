@@ -1,111 +1,97 @@
-"""Presentation views for driver parking search and reservation."""
+"""Driver parking search, booking and confirmation pages."""
 
-
+from urllib.parse import urlencode
 
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404, redirect, render
-from django.views.decorators.http import require_http_methods, require_POST
+from django.urls import reverse
+from django.views.decorators.http import require_GET, require_POST
 
-from vps.lots.models import Lot
-from vps.reservations.forms import ReservationConfirmForm
+from vps.accounts.permissions import function_required
+from vps.accounts.roles import Function, can
+from vps.reservations.forms import ReservationSearchForm
 from vps.reservations.models import Reservation
-from vps.reservations.services import reserve
-from vps.vehicles.models import Vehicle
+from vps.reservations.services import free_slots, reserve, validate_window
+
+SEARCH_FIELDS = ("lot", "vehicle", "start", "end")
 
 
-@login_required
-@require_http_methods(["GET", "POST"])
+@require_GET
+@function_required(Function.SEARCH)
 def slot_search(request):
-    """Search for suitable parking slots."""
-    lots = Lot.objects.all()
-    vehicles = Vehicle.objects.filter(
-        owner=request.user,
-        is_active=True,
-    )
-
+    """FR-SRCH-01: count the slots free for the chosen vehicle and window."""
+    searched = any(request.GET.get(name) for name in SEARCH_FIELDS)
+    form = ReservationSearchForm(request.GET if searched else None, user=request.user)
     context = {
-        "lots": lots,
-        "vehicles": vehicles,
+        "lots": form.fields["lot"].queryset,
+        "vehicles": form.fields["vehicle"].queryset,
         "selected_lot": request.GET.get("lot", ""),
         "selected_vehicle": request.GET.get("vehicle", ""),
         "start": request.GET.get("start", ""),
         "end": request.GET.get("end", ""),
         "slot_count": None,
         "search_error": "",
-        "search_url": "",
+        "search_url": reverse("reservations:search"),
+        "confirm_url": "",
     }
-
-    # Keep your existing availability-search implementation here.
-    # This view should call the search service to validate the window
-    # and count available slots when the GET parameters are valid.
-
-    if request.method == "POST":
-        form = ReservationConfirmForm(request.POST, user=request.user)
-
+    if searched:
         if form.is_valid():
+            lot, vehicle, start, end = (form.cleaned_data[name] for name in SEARCH_FIELDS)
             try:
-                reservation = reserve(
-                    driver=request.user,
-                    vehicle=form.cleaned_data["vehicle"],
-                    lot=form.cleaned_data["lot"],
-                    start=form.cleaned_data["start"],
-                    end=form.cleaned_data["end"],
-                )
-            except ValidationError as exc:
-                form.add_error(None, exc)
+                validate_window(lot, start, end)
+            except ValidationError as error:
+                context["search_error"] = error.messages[0]
             else:
-                return redirect(
-                    "reservations:confirmation",
-                    booking_ref=reservation.booking_ref,
-                )
+                context["slot_count"] = len(free_slots(lot, vehicle, start, end))
+                if can(request.user, Function.OWN_RESERVATIONS):
+                    context["confirm_url"] = reverse("reservations:confirm")
+        else:
+            context["search_error"] = "Choose a lot, one of your vehicles, a start and an end."
+    htmx = request.headers.get("HX-Request") == "true"
+    template = "slots/search_result.html" if htmx else "slots/search.html"
+    return render(request, template, context)
 
-        context["booking_form"] = form
 
-    return render(request, "slots/search.html", context)
-
-
-@login_required
 @require_POST
+@function_required(Function.OWN_RESERVATIONS)
 def confirm_reservation(request):
-    """Create a reservation after revalidating the driver's selection."""
-    form = ReservationConfirmForm(request.POST, user=request.user)
-
-    if not form.is_valid():
-        messages.error(request, "Please correct the booking details.")
-        return redirect("reservations:search")
-
-    try:
-        reservation = reserve(
-            driver=request.user,
-            vehicle=form.cleaned_data["vehicle"],
-            lot=form.cleaned_data["lot"],
-            start=form.cleaned_data["start"],
-            end=form.cleaned_data["end"],
-        )
-    except ValidationError as exc:
-        for error in exc.messages:
-            messages.error(request, error)
-        return redirect("reservations:search")
-
-    return redirect(
-        "reservations:confirmation",
-        booking_ref=reservation.booking_ref,
+    """FR-RES-01: book the searched window, or go back to the search with the reason."""
+    form = ReservationSearchForm(request.POST, user=request.user)
+    back = (
+        reverse("reservations:search")
+        + "?"
+        + urlencode({name: request.POST.get(name, "") for name in SEARCH_FIELDS})
     )
+    if not form.is_valid():
+        messages.error(request, "Choose a lot, one of your vehicles, a start and an end.")
+        return redirect(back)
+    try:
+        data = form.cleaned_data
+        reservation = reserve(
+            request.user, data["vehicle"], data["lot"], data["start"], data["end"]
+        )
+    except ValidationError as error:
+        for message in error.messages:
+            messages.error(request, message)
+        return redirect(back)
+    return redirect("reservations:confirmation", booking_ref=reservation.booking_ref)
 
 
-@login_required
+@function_required(Function.OWN_RESERVATIONS)
 def reservation_confirmation(request, booking_ref):
-    """Display the booking reference and allocated slot."""
+    """Show the booking reference and slot code (FR-RES-01)."""
     reservation = get_object_or_404(
-        Reservation.objects.select_related("slot", "driver"),
+        Reservation.objects.select_related("slot__lot"),
         booking_ref=booking_ref,
         driver=request.user,
     )
-
     return render(
         request,
         "reservations/confirmation.html",
-        {"reservation": reservation},
+        {
+            "booking_reference": reservation.booking_ref,
+            "slot_code": reservation.slot.code,
+            "lot_name": reservation.slot.lot.name,
+        },
     )
