@@ -103,6 +103,21 @@ export POSTGRES_HOST=localhost
 Stop the services with `docker compose down`. To reset the database, use
 `docker compose down -v`; this removes the named volume and its data.
 
+### No-show expiry
+
+The Compose `scheduler` service shares the web image and environment. It waits for
+the database and web service to be healthy (so migrations have finished), then runs
+`python manage.py expire_no_shows` every 60 seconds. Reserved bookings expire only
+when more than 15 minutes have passed since their start, freeing the slot and
+recording a Rs 50.00 no-show charge. Repeated runs do not charge again.
+
+On a server, run the same command every minute with cron, using the application's
+Python environment and exported Django/database settings:
+
+```cron
+* * * * * cd /app && python manage.py expire_no_shows
+```
+
 ## Status
 
 Sprint 1 is under way. The Django project skeleton is in place. CI runs ruff, the test suite on PostgreSQL 16 with a 70% line and 60% branch coverage gate, pip-audit and a Gitleaks secret scan on every pull request.
