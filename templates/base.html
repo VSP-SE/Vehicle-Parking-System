@@ -458,6 +458,7 @@
           <a href="{% url 'lots:list' %}">Parking lots</a>
         {% elif user.role == "Attendant" %}
           <a href="{% url 'reservations:search' %}">Slot search</a>
+          <a href="{% url 'gate:walk_in' %}">Walk-in</a>
           <a href="{% url 'gate:payments' %}">Payments</a>
         {% endif %}
       </nav>

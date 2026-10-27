@@ -82,7 +82,16 @@ def _next_reservation_id():
         return cursor.fetchone()[0]
 
 
-def _try_book(slot, driver, vehicle, period):
+def _try_book(
+    slot,
+    driver,
+    vehicle,
+    period,
+    *,
+    status=Reservation.Status.RESERVED,
+    is_walk_in=False,
+    entry_time=None,
+):
     """Insert the reservation, or return None when a concurrent booking already holds the slot."""
     pk = _next_reservation_id()
     reservation = Reservation(
@@ -92,6 +101,9 @@ def _try_book(slot, driver, vehicle, period):
         vehicle_reg_no=vehicle.registration_no,
         slot=slot,
         period=period,
+        status=status,
+        is_walk_in=is_walk_in,
+        entry_time=entry_time,
     )
     try:
         with transaction.atomic():

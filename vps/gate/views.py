@@ -1,4 +1,4 @@
-"""Gate Attendant payment pages (FR-GATE-05)."""
+"""Gate Attendant walk-in and payment pages (FR-GATE-03, 05)."""
 
 from urllib.parse import urlencode
 
@@ -6,12 +6,14 @@ from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
-from django.views.decorators.http import require_GET, require_POST
+from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from vps.accounts.permissions import function_required
 from vps.accounts.roles import Function
 from vps.billing.models import Charge, Payment
 from vps.billing.services import record_payment, unpaid_charges
+from vps.gate.forms import WalkInForm
+from vps.gate.services import register_walk_in
 
 
 @function_required(Function.GATE_OPERATIONS)
@@ -44,3 +46,23 @@ def pay_charge(request, charge_id):
             f"{payment.charge.reservation.booking_ref}",
         )
     return redirect(back)
+
+
+@function_required(Function.GATE_OPERATIONS)
+@require_http_methods(["GET", "POST"])
+def walk_in(request):
+    """FR-GATE-03: register an arrival and show its slot and booking reference."""
+    form = WalkInForm(request.POST if request.method == "POST" else None)
+    if request.method == "POST" and form.is_valid():
+        try:
+            reservation = register_walk_in(request.user, **form.cleaned_data)
+        except ValidationError as error:
+            form.add_error(None, error)
+        else:
+            messages.success(
+                request,
+                f"Walk-in {reservation.vehicle_reg_no} parked in "
+                f"{reservation.slot.code} ({reservation.booking_ref}).",
+            )
+            return redirect("gate:walk_in")
+    return render(request, "gate/walk_in.html", {"form": form})
