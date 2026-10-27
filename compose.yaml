@@ -18,10 +18,11 @@ services:
       start_period: 10s
 
   web:
+    image: vps-web
     build: .
-    env_file:
+    env_file: &web-env-file
       - .env
-    environment:
+    environment: &web-environment
       POSTGRES_HOST: db
       POSTGRES_PORT: "5432"
     depends_on:
@@ -45,6 +46,23 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+
+  scheduler:
+    image: vps-web
+    build: .
+    env_file: *web-env-file
+    environment: *web-environment
+    depends_on:
+      db:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+    command:
+      - sh
+      - -c
+      - while true; do python manage.py expire_no_shows; sleep 60; done
+    volumes:
+      - .:/app
 
 volumes:
   postgres_data:

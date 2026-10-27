@@ -1,6 +1,7 @@
 """Booking rules: slot search, limits (FR-RES-03) and race-safe reservation (FR-RES-01, 02)."""
 
 from datetime import timedelta
+from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, connection, transaction
@@ -10,6 +11,7 @@ from django.utils import timezone
 from vps.accounts.models import User
 from vps.accounts.roles import Function, can
 from vps.allocation.services import allocate_slot_with_retry, eligible_slot_types
+from vps.audit.models import AuditLog
 from vps.billing.models import Charge
 from vps.lots.models import Slot
 from vps.reservations.models import Reservation
@@ -21,6 +23,8 @@ MAX_OPEN_RESERVATIONS = 2
 MIN_WINDOW = timedelta(minutes=30)
 MAX_WINDOW = timedelta(hours=24)
 MAX_START_AHEAD = timedelta(days=7)
+NO_SHOW_GRACE = timedelta(minutes=15)
+NO_SHOW_CHARGE_INR = Decimal("50.00")
 
 
 def validate_window(lot, start, end, now=None):
@@ -144,3 +148,35 @@ def reserve(driver, vehicle, lot, start, end):
         if allocate_slot_with_retry(free_slots(lot, vehicle, start, end), vehicle, try_book):
             return booked["reservation"]
     raise ValidationError({"__all__": NO_SLOT})
+
+
+def expire_no_shows(now=None):
+    """FR-RES-05: expire Reserved bookings strictly after FR-GATE-01's 15-minute grace.
+
+    Lock each eligible row and skip rows held by another job or a gate check-in.
+    Status, no-show charge and audit entry commit together; Expired frees the slot.
+    """
+    now = now or timezone.now()
+    expired = 0
+    with transaction.atomic():
+        reservations = Reservation.objects.filter(
+            status=Reservation.Status.RESERVED,
+            period__startswith__lt=now - NO_SHOW_GRACE,
+        ).select_for_update(skip_locked=True)
+        for reservation in reservations:
+            reservation.status = Reservation.Status.EXPIRED
+            reservation.save(update_fields=["status"])
+            Charge.objects.create(
+                reservation=reservation,
+                kind=Charge.Kind.NO_SHOW,
+                amount_inr=NO_SHOW_CHARGE_INR,
+            )
+            AuditLog.objects.create(
+                actor=None,
+                action="reservation.expired",
+                target=f"reservation:{reservation.booking_ref}",
+                before={"status": Reservation.Status.RESERVED},
+                after={"status": Reservation.Status.EXPIRED},
+            )
+            expired += 1
+    return expired
