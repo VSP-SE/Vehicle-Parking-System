@@ -1,14 +1,12 @@
 """Parking-lot business rules, shared by HTTP and non-HTTP callers."""
 
-from django.core.exceptions import ValidationError
-from django.db import IntegrityError, transaction
-
-from vps.lots.models import Lot, Slot
 from datetime import datetime
 
 from django.contrib.postgres.fields.ranges import DateTimeTZRange
+from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
 
-from vps.lots.models import SlotBlock
+from vps.lots.models import Lot, Slot, SlotBlock
 
 DUPLICATE_MESSAGE = "A parking lot with this name and address already exists. Change either field."
 REQUIRED_MESSAGES = {
