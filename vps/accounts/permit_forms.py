@@ -1,6 +1,6 @@
-from django import forms
+"""Form for the Lot Administrator's accessible-permit page (FR-AUTH-06)."""
 
-from vps.accounts.models import User
+from django import forms
 
 
 class AccessiblePermitForm(forms.Form):
@@ -8,6 +8,3 @@ class AccessiblePermitForm(forms.Form):
         required=False,
         label="Accessible-parking permit holder",
     )
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)

@@ -4,15 +4,15 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.shortcuts import redirect, render, get_object_or_404
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.http import url_has_allowed_host_and_scheme
-from django.views.decorators.http import require_http_methods, require_POST, require_safe, login_required
+from django.views.decorators.http import require_http_methods, require_POST, require_safe
 
 from vps.accounts import services
 from vps.accounts.forms import RegistrationForm, SignInForm, StaffRegistrationForm
 from vps.accounts.models import User
 from vps.accounts.permissions import role_required
-from vps.accounts.roles import Role, user_roles
+from vps.accounts.permit_forms import AccessiblePermitForm
 
 
 @require_http_methods(["GET", "POST"])
@@ -85,12 +85,11 @@ def home(request):
         raise PermissionDenied
     return redirect(destinations[request.user.role])
 
+
 @role_required(User.Role.ADMIN)
 @require_http_methods(["GET", "POST"])
 def create_staff(request):
-    form = StaffRegistrationForm(
-        request.POST if request.method == "POST" else None
-    )
+    form = StaffRegistrationForm(request.POST if request.method == "POST" else None)
 
     if request.method == "POST" and form.is_valid():
         try:
@@ -113,32 +112,31 @@ def create_staff(request):
         {"form": form},
     )
 
-@login_required
+
+@role_required(User.Role.ADMIN)
+@require_safe
+def drivers(request):
+    """FR-AUTH-06: find Drivers by e-mail to check their permit status."""
+    query = request.GET.get("q", "").strip()
+    found = User.objects.filter(role=User.Role.DRIVER).order_by("email")
+    if query:
+        found = found.filter(email__icontains=query)
+    return render(request, "accounts/drivers.html", {"drivers": found, "q": query})
+
+
+@role_required(User.Role.ADMIN)
 @require_http_methods(["GET", "POST"])
 def manage_accessible_permit(request, user_id):
-    if Role.ADMIN not in user_roles(request.user):
-        raise PermissionDenied
-
-    driver = get_object_or_404(
-        User,
-        pk=user_id,
-        role=User.Role.DRIVER,
+    """FR-AUTH-06: mark a Driver as a permit holder after an offline check."""
+    driver = get_object_or_404(User, pk=user_id, role=User.Role.DRIVER)
+    form = AccessiblePermitForm(
+        request.POST if request.method == "POST" else None,
+        initial={"accessible_permit": driver.accessible_permit},
     )
-
-    if request.method == "POST":
-        driver.accessible_permit = (
-            request.POST.get("accessible_permit") == "on"
-        )
-        driver.save(update_fields=["accessible_permit"])
-
-        messages.success(
-            request,
-            f"Accessible-parking permit status updated for {driver.email}.",
-        )
+    if form.is_valid():
+        services.set_accessible_permit(request.user, driver, form.cleaned_data["accessible_permit"])
+        messages.success(request, f"Accessible-parking permit status updated for {driver.email}.")
         return redirect("accounts:manage_accessible_permit", user_id=driver.pk)
-
     return render(
-        request,
-        "accounts/manage_accessible_permit.html",
-        {"driver": driver},
+        request, "accounts/manage_accessible_permit.html", {"driver": driver, "form": form}
     )
