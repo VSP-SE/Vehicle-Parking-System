@@ -1,6 +1,6 @@
 """FR-VEH-04 – Protect vehicles that have live bookings (#29)."""
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 import pytest
 from django.core.exceptions import ValidationError

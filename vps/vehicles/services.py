@@ -7,8 +7,8 @@ from django.db import IntegrityError, transaction
 
 from vps.accounts.models import User
 from vps.accounts.roles import Function, can
-from vps.vehicles.models import Vehicle
 from vps.reservations.models import Reservation
+from vps.vehicles.models import Vehicle
 
 DUPLICATE_REGISTRATION = "An active vehicle with this registration number already exists."
 
