@@ -7,6 +7,8 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 
 from vps.accounts.models import User
+from vps.accounts.roles import Function, can
+from vps.audit.models import AuditLog
 
 DUPLICATE_EMAIL = "An account with this e-mail already exists"
 
@@ -103,3 +105,24 @@ def create_staff(*, full_name, email, mobile, password, role):
         ) == "accounts_user_email_key":
             raise ValidationError({"email": DUPLICATE_EMAIL}) from error
         raise
+
+
+def set_accessible_permit(admin, driver, has_permit):
+    """FR-AUTH-06: a Lot Administrator records a Driver's permit, audited when it changes."""
+    if not can(admin, Function.MANAGE_STAFF):
+        raise ValidationError({"__all__": "Only Lot Administrators may change permits."})
+    if driver.role != User.Role.DRIVER:
+        raise ValidationError({"__all__": "Only Drivers can hold an accessible-parking permit."})
+    if driver.accessible_permit == has_permit:
+        return driver
+    with transaction.atomic():
+        AuditLog.objects.create(
+            actor=admin,
+            action="driver.permit_changed",
+            target=f"user:{driver.pk}",
+            before={"accessible_permit": driver.accessible_permit},
+            after={"accessible_permit": has_permit},
+        )
+        driver.accessible_permit = has_permit
+        driver.save(update_fields=["accessible_permit"])
+    return driver

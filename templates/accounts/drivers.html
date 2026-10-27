@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Drivers · VPS{% endblock %}
+{% block content %}
+<h1>Drivers</h1>
+<form method="get" action="{% url 'accounts:drivers' %}">
+  <div class="field">
+    <label for="driver-query">E-mail address contains</label>
+    <input id="driver-query" name="q" type="search" value="{{ q }}">
+  </div>
+  <button type="submit">Search Drivers</button>
+</form>
+<table>
+  <thead><tr><th scope="col">Name</th><th scope="col">E-mail</th><th scope="col">Accessible permit</th><th scope="col">Actions</th></tr></thead>
+  <tbody>
+  {% for driver in drivers %}
+    <tr>
+      <td>{{ driver.full_name|default:"(no name)" }}</td>
+      <td>{{ driver.email }}</td>
+      <td>{% if driver.accessible_permit %}Permit holder{% else %}No permit{% endif %}</td>
+      <td><a href="{% url 'accounts:manage_accessible_permit' driver.pk %}">Change permit for <span>{{ driver.email }}</span></a></td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="4">No Drivers found.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

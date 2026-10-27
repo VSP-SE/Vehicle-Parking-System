@@ -456,6 +456,7 @@
           <a href="{% url 'reservations:search' %}">Find parking</a>
         {% elif user.role == "Admin" %}
           <a href="{% url 'lots:list' %}">Parking lots</a>
+          <a href="{% url 'accounts:drivers' %}">Drivers</a>
         {% elif user.role == "Attendant" %}
           <a href="{% url 'reservations:search' %}">Slot search</a>
           <a href="{% url 'gate:walk_in' %}">Walk-in</a>
