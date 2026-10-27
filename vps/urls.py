@@ -12,6 +12,7 @@ urlpatterns = [
     path("vehicles/", include("vps.vehicles.urls")),
     path("lots/", include("vps.lots.urls")),
     path("reservations/", include("vps.reservations.urls")),
+    path("gate/", include("vps.gate.urls")),
     path("admin/", admin.site.urls),
     path("healthz", healthz, name="healthz"),
 ]
