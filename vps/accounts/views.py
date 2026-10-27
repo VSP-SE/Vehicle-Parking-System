@@ -1,16 +1,18 @@
 """Authentication pages and role-specific home routing."""
 
 from django.conf import settings
+from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.shortcuts import redirect, render
+from django.shortcuts import redirect, render, get_object_or_404
 from django.utils.http import url_has_allowed_host_and_scheme
-from django.views.decorators.http import require_http_methods, require_POST, require_safe
+from django.views.decorators.http import require_http_methods, require_POST, require_safe, login_required
 
 from vps.accounts import services
 from vps.accounts.forms import RegistrationForm, SignInForm, StaffRegistrationForm
 from vps.accounts.models import User
 from vps.accounts.permissions import role_required
+from vps.accounts.roles import Role, user_roles
 
 
 @require_http_methods(["GET", "POST"])
@@ -109,4 +111,34 @@ def create_staff(request):
         request,
         "accounts/create_staff.html",
         {"form": form},
+    )
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def manage_accessible_permit(request, user_id):
+    if Role.ADMIN not in user_roles(request.user):
+        raise PermissionDenied
+
+    driver = get_object_or_404(
+        User,
+        pk=user_id,
+        role=User.Role.DRIVER,
+    )
+
+    if request.method == "POST":
+        driver.accessible_permit = (
+            request.POST.get("accessible_permit") == "on"
+        )
+        driver.save(update_fields=["accessible_permit"])
+
+        messages.success(
+            request,
+            f"Accessible-parking permit status updated for {driver.email}.",
+        )
+        return redirect("accounts:manage_accessible_permit", user_id=driver.pk)
+
+    return render(
+        request,
+        "accounts/manage_accessible_permit.html",
+        {"driver": driver},
     )
