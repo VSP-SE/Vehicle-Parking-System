@@ -8,6 +8,7 @@ from django.db import IntegrityError, transaction
 from vps.accounts.models import User
 from vps.accounts.roles import Function, can
 from vps.vehicles.models import Vehicle
+from vps.reservations.models import Reservation
 
 DUPLICATE_REGISTRATION = "An active vehicle with this registration number already exists."
 
@@ -47,4 +48,33 @@ def add_vehicle(owner, registration_no, vehicle_type, nickname=""):
         ):
             raise ValidationError({"registration_no": DUPLICATE_REGISTRATION}) from error
         raise
+    return vehicle
+
+
+
+VEHICLE_HAS_LIVE_BOOKING = (
+    "This vehicle cannot be removed because it has an active or reserved booking."
+)
+
+
+def remove_vehicle(vehicle: Vehicle) -> Vehicle:
+    """
+    Soft-delete a vehicle (set is_active=False).
+
+    Raises ValidationError if the vehicle has any reservation
+    in Reserved or Active status (FR-VEH-04).
+    """
+    if not vehicle.is_active:
+        return vehicle  # already removed
+
+    has_live_booking = Reservation.objects.filter(
+        vehicle_reg_no=vehicle.registration_no,
+        status__in=[Reservation.Status.RESERVED, Reservation.Status.ACTIVE],
+    ).exists()
+
+    if has_live_booking:
+        raise ValidationError({"__all__": VEHICLE_HAS_LIVE_BOOKING})
+
+    vehicle.is_active = False
+    vehicle.save(update_fields=["is_active"])
     return vehicle
