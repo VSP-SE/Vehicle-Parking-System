@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}Accessible-parking permit · VPS{% endblock %}
+
+{% block content %}
+<section aria-labelledby="permit-heading">
+  <h1 id="permit-heading">Accessible-parking permit</h1>
+
+  <p>Driver: {{ driver.full_name|default:"(no name)" }}</p>
+  <p>E-mail: {{ driver.email }}</p>
+  <p>Check the Driver's permit offline before changing this setting.</p>
+
+  <form method="post">
+    {% csrf_token %}
+    <div class="field">
+      <label>
+        <input type="checkbox" name="accessible_permit" {% if form.accessible_permit.value %}checked{% endif %}>
+        Accessible-parking permit holder
+      </label>
+    </div>
+    <button type="submit">Save permit status</button>
+  </form>
+
+  <p><a href="{% url 'accounts:drivers' %}">Back to Drivers</a></p>
+</section>
+{% endblock %}
