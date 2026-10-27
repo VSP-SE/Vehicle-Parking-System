@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Payments · VPS{% endblock %}
+{% block content %}
+<h1>Payments</h1>
+<form method="get" action="{% url 'gate:payments' %}">
+  <div class="field">
+    <label for="payment-query">Booking reference or vehicle registration number</label>
+    <input id="payment-query" name="q" type="search" value="{{ q }}">
+  </div>
+  <button type="submit">Search unpaid charges</button>
+</form>
+<table>
+  <caption>Unpaid charges</caption>
+  <thead>
+    <tr>
+      <th scope="col">Booking reference</th>
+      <th scope="col">Vehicle</th>
+      <th scope="col">Charge kind</th>
+      <th scope="col">Amount</th>
+      <th scope="col">Payment</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for charge in charges %}
+    <tr>
+      <td>{{ charge.reservation.booking_ref }}</td>
+      <td>{{ charge.reservation.vehicle_reg_no }}</td>
+      <td>{{ charge.get_kind_display }}</td>
+      <td>Rs {{ charge.amount_inr|floatformat:2 }}</td>
+      <td>
+        <form method="post" action="{% url 'gate:pay_charge' charge.pk %}">
+          {% csrf_token %}
+          <input type="hidden" name="q" value="{{ q }}">
+          <label for="method-{{ charge.pk }}">Payment method for {{ charge.get_kind_display }} charge on {{ charge.reservation.booking_ref }}</label>
+          <select id="method-{{ charge.pk }}" name="method" required>
+            {% for value, label in methods %}
+            <option value="{{ value }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+          <button type="submit">Record payment</button>
+        </form>
+      </td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="5">{% if q %}No unpaid charges found.{% else %}Search by booking reference or registration number.{% endif %}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

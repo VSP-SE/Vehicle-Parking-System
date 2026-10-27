@@ -1,9 +1,12 @@
 """Parking-lot business rules, shared by HTTP and non-HTTP callers."""
 
+from datetime import datetime
+
+from django.contrib.postgres.fields.ranges import DateTimeTZRange
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 
-from vps.lots.models import Lot, Slot
+from vps.lots.models import Lot, Slot, SlotBlock
 
 DUPLICATE_MESSAGE = "A parking lot with this name and address already exists. Change either field."
 REQUIRED_MESSAGES = {
@@ -146,3 +149,54 @@ def create_slot(*, lot: Lot, code: str, slot_type: str, distance_rank: int) -> S
         raise
 
     return slot
+OVERLAPPING_BLOCK_MESSAGE = "This slot already has a block that overlaps the requested period."
+
+
+def block_slot(
+    *,
+    slot: Slot,
+    starts_at: datetime,
+    ends_at: datetime,
+    reason: str,
+) -> SlotBlock:
+    """
+    Block a slot for the given period with a reason (FR-LOT-03).
+
+    Raises ValidationError if:
+    - the period is invalid (end <= start)
+    - reason is empty
+    - the period overlaps an existing block on the same slot
+    """
+    reason = (reason or "").strip()
+    errors = {}
+
+    if not reason:
+        errors["reason"] = "Enter a reason for the block."
+    if starts_at is None or ends_at is None:
+        errors["period"] = "Both start and end times are required."
+    elif ends_at <= starts_at:
+        errors["period"] = "End time must be later than start time."
+
+    if errors:
+        raise ValidationError(errors)
+
+    period = DateTimeTZRange(starts_at, ends_at)
+
+    # Friendly pre-check for overlapping blocks
+    if SlotBlock.objects.filter(slot=slot, period__overlap=period).exists():
+        raise ValidationError({"period": OVERLAPPING_BLOCK_MESSAGE})
+
+    block = SlotBlock(slot=slot, period=period, reason=reason)
+
+    try:
+        with transaction.atomic():
+            block.save()
+    except IntegrityError as error:
+        constraint = getattr(
+            getattr(error.__cause__, "diag", None), "constraint_name", None
+        )
+        if constraint == "slotblock_period_no_overlap":
+            raise ValidationError({"period": OVERLAPPING_BLOCK_MESSAGE}) from error
+        raise
+
+    return block
