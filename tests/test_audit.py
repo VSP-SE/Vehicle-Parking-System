@@ -2,6 +2,7 @@
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.core.exceptions import PermissionDenied
 
 from vps.audit.models import AuditLog
 from vps.audit.services import log_action
@@ -51,22 +52,23 @@ def test_log_action_requires_action_and_target():
         log_action(action="test", target="")
 
 
-def test_audit_log_is_append_only(user):
-    """There should be no service-level way to update or delete entries."""
-    entry = log_action(
-        actor=user,
-        action="test.action",
-        target="test.target",
-        before={"a": 1},
-        after={"a": 2},
-    )
-
-    # Direct model update is possible at DB level, but the service
-    # intentionally provides no update/delete helpers.
-    assert not hasattr(log_action, "update")
-    assert not hasattr(log_action, "delete")
-
-    # Entry still exists and is unchanged
+def test_saved_entries_cannot_be_edited(user):
+    """SEC-07: application code cannot change an audit entry once written."""
+    entry = log_action(actor=user, action="test.action", target="t", before={"a": 1})
+    entry.before = {"a": 2}
+    with pytest.raises(PermissionDenied):
+        entry.save()
+    with pytest.raises(PermissionDenied):
+        AuditLog.objects.filter(pk=entry.pk).update(action="edited")
     entry.refresh_from_db()
-    assert entry.before == {"a": 1}
+    assert (entry.action, entry.before) == ("test.action", {"a": 1})
+
+
+def test_entries_cannot_be_deleted(user):
+    """SEC-07: neither one entry nor a queryset can be deleted."""
+    entry = log_action(actor=user, action="test.action", target="t")
+    with pytest.raises(PermissionDenied):
+        entry.delete()
+    with pytest.raises(PermissionDenied):
+        AuditLog.objects.all().delete()
     assert AuditLog.objects.filter(pk=entry.pk).exists()
