@@ -1,0 +1,28 @@
+
+{% extends "base.html" %}
+
+{% block title %}Vehicle Checkout | Vehicle Parking System{% endblock %}
+
+{% block content %}
+<section class="booking-page">
+  <h1>Vehicle Checkout</h1>
+  <p>
+    Enter an active booking reference or vehicle registration number
+    to record the vehicle's exit and calculate its charges.
+  </p>
+
+  <form method="post">
+    {% csrf_token %}
+
+    {{ form.non_field_errors }}
+
+    <div class="field">
+      {{ form.query.label_tag }}
+      {{ form.query }}
+      {{ form.query.errors }}
+    </div>
+
+    <button type="submit">Check Out Vehicle</button>
+  </form>
+</section>
+{% endblock %}
