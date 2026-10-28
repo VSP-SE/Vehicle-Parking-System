@@ -25,6 +25,7 @@ MAX_WINDOW = timedelta(hours=24)
 MAX_START_AHEAD = timedelta(days=7)
 NO_SHOW_GRACE = timedelta(minutes=15)
 NO_SHOW_CHARGE_INR = Decimal("50.00")
+LATE_CANCELLATION_CHARGE_INR = Decimal("30.00")
 
 
 def validate_window(lot, start, end, now=None):
@@ -180,3 +181,44 @@ def expire_no_shows(now=None):
             )
             expired += 1
     return expired
+
+
+
+LATE_CANCELLATION_WINDOW = timedelta(minutes=60)
+
+
+@transaction.atomic
+def cancel_reservation(*, driver, reservation_id, now=None):
+    """FR-RES-04: cancel a Driver's Reserved booking before it starts; Rs 30 if under 60 min."""
+    if not can(driver, Function.OWN_RESERVATIONS):
+        raise ValidationError({"__all__": "Only Drivers may cancel their reservations."})
+    reservation = Reservation.objects.select_for_update().get(pk=reservation_id, driver=driver)
+    if reservation.status != Reservation.Status.RESERVED:
+        raise ValidationError({"__all__": "Only Reserved reservations can be cancelled."})
+    now = now or timezone.now()
+    start = reservation.period.lower
+    if now >= start:
+        raise ValidationError(
+            {"__all__": "Reservations can only be cancelled before their start time."}
+        )
+    # Exactly 60 minutes before the start is still a free cancellation.
+    late = start - now < LATE_CANCELLATION_WINDOW
+    if late:
+        Charge.objects.create(
+            reservation=reservation,
+            kind=Charge.Kind.LATE_CANCEL,
+            amount_inr=LATE_CANCELLATION_CHARGE_INR,
+        )
+    reservation.status = Reservation.Status.CANCELLED
+    reservation.save(update_fields=["status"])
+    AuditLog.objects.create(
+        actor=driver,
+        action="reservation.cancelled",
+        target=f"reservation:{reservation.booking_ref}",
+        before={"status": Reservation.Status.RESERVED},
+        after={
+            "status": Reservation.Status.CANCELLED,
+            "late_cancellation_inr": str(LATE_CANCELLATION_CHARGE_INR) if late else "0.00",
+        },
+    )
+    return reservation
