@@ -18,4 +18,5 @@ urlpatterns = [
         views.reservation_confirmation,
         name="confirmation",
     ),
+    path("<int:reservation_id>/cancel/", views.cancel_booking, name="cancel"),
 ]
