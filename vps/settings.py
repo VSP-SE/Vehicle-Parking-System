@@ -106,3 +106,9 @@ LOGGING = {
         "vps.security": {"handlers": ["console"], "level": "WARNING"},
     },
 }
+
+PASSWORD_RESET_TIMEOUT = 1800  # 30 minutes
+DEFAULT_FROM_EMAIL = os.environ.get(
+    "DEFAULT_FROM_EMAIL",
+    EMAIL_HOST_USER or "webmaster@localhost",
+)
