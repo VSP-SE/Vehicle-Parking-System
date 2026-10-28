@@ -108,7 +108,7 @@ def receipt(request, booking_ref):
         status=Reservation.Status.COMPLETED,
     )
 
-    charges = list(reservation.charges.prefetch_related("payment").order_by("id"))
+    charges = list(reservation.charges.select_related("payment").order_by("id"))
 
     total = sum(
         (charge.amount_inr for charge in charges),
@@ -125,9 +125,13 @@ def receipt(request, booking_ref):
         parking_end = min(parking_end, reservation.period.upper)
     parking_hours = _billable_hours(parking_end - reservation.entry_time, minimum_one_hour=True)
     overstay_hours = Decimal("0.0")
-    if not reservation.is_walk_in:
+    if (
+        not reservation.is_walk_in
+        and reservation.exit_time > reservation.period.upper + CHECKOUT_GRACE
+    ):
         overstay_hours = _billable_hours(
-            reservation.exit_time - (reservation.period.upper + CHECKOUT_GRACE)
+            reservation.exit_time
+            - (reservation.period.upper + CHECKOUT_GRACE)
         )
 
     return render(
