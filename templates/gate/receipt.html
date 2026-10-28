@@ -1,0 +1,99 @@
+
+{% extends "base.html" %}
+
+{% block title %}Checkout Receipt | Vehicle Parking System{% endblock %}
+
+{% block content %}
+<section class="booking-page">
+  <div class="booking-card">
+    <h1>Checkout Receipt</h1>
+    <p>Vehicle checkout completed successfully.</p>
+
+    <div class="booking-detail">
+      <span>Booking reference</span>
+      <strong>{{ reservation.booking_ref }}</strong>
+    </div>
+
+    <div class="booking-detail">
+      <span>Vehicle registration</span>
+      <strong>{{ reservation.vehicle_reg_no }}</strong>
+    </div>
+
+    <div class="booking-detail">
+      <span>Parking lot</span>
+      <strong>{{ reservation.slot.lot.name }}</strong>
+    </div>
+
+    <div class="booking-detail">
+      <span>Slot</span>
+      <strong>{{ reservation.slot.code }}</strong>
+    </div>
+
+    <div class="booking-detail">
+      <span>Entry time</span>
+      <strong>{{ reservation.entry_time|date:"d M Y, H:i" }}</strong>
+    </div>
+
+    <div class="booking-detail">
+      <span>Exit time</span>
+      <strong>{{ reservation.exit_time|date:"d M Y, H:i" }}</strong>
+    </div>
+
+    <h2>Itemised charges</h2>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Charge</th>
+          <th>Amount (INR)</th>
+          <th>Payment status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for charge in charges %}
+          <tr>
+            <td>{{ charge.get_kind_display }}</td>
+            <td>₹{{ charge.amount_inr|floatformat:2 }}</td>
+            <td>
+              {% if charge.payment %}
+                Paid
+              {% else %}
+                Unpaid
+              {% endif %}
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="3">No charges recorded.</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr>
+          <th>Total</th>
+          <th>₹{{ total|floatformat:2 }}</th>
+          <th></th>
+        </tr>
+        <tr>
+          <td>Paid</td>
+          <td>₹{{ paid_total|floatformat:2 }}</td>
+          <td></td>
+        </tr>
+        <tr>
+          <th>Balance due</th>
+          <th>₹{{ balance_due|floatformat:2 }}</th>
+          <th></th>
+        </tr>
+      </tfoot>
+    </table>
+
+    <p>
+      The reservation is Completed, and its slot is available for
+      another booking where the time window permits.
+    </p>
+
+    <a href="{% url 'gate:payments' %}">Go to payment processing</a>
+    <a href="{% url 'gate:checkout' %}">Check out another vehicle</a>
+  </div>
+</section>
+{% endblock %}

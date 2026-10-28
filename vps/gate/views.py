@@ -1,5 +1,6 @@
 """Gate Attendant walk-in and payment pages (FR-GATE-03, 05)."""
 
+from decimal import Decimal
 from urllib.parse import urlencode
 
 from django.contrib import messages
@@ -12,8 +13,9 @@ from vps.accounts.permissions import function_required
 from vps.accounts.roles import Function
 from vps.billing.models import Charge, Payment
 from vps.billing.services import record_payment, unpaid_charges
-from vps.gate.forms import WalkInForm
-from vps.gate.services import register_walk_in
+from vps.gate.forms import CheckoutForm, WalkInForm
+from vps.gate.services import checkout_vehicle, register_walk_in
+from vps.reservations.models import Reservation
 
 
 @function_required(Function.GATE_OPERATIONS)
@@ -66,3 +68,67 @@ def walk_in(request):
             )
             return redirect("gate:walk_in")
     return render(request, "gate/walk_in.html", {"form": form})
+
+
+@function_required(Function.GATE_OPERATIONS)
+@require_http_methods(["GET", "POST"])
+def checkout(request):
+    """FR-GATE-04: check out an active vehicle and display its receipt."""
+    form = CheckoutForm(request.POST or None)
+
+    if request.method == "POST" and form.is_valid():
+        try:
+            reservation = checkout_vehicle(
+                query=form.cleaned_data["query"],
+                attendant=request.user,
+            )
+        except ValidationError as error:
+            form.add_error(None, error)
+        else:
+            return redirect(
+                "gate:receipt",
+                booking_ref=reservation.booking_ref,
+            )
+
+    return render(request, "gate/checkout.html", {"form": form})
+
+
+@function_required(Function.GATE_OPERATIONS)
+def receipt(request, booking_ref):
+    """Display the itemised checkout receipt."""
+    reservation = get_object_or_404(
+        Reservation.objects.select_related("slot__lot"),
+        booking_ref=booking_ref,
+        status=Reservation.Status.COMPLETED,
+    )
+
+    charges = list(
+        reservation.charges.prefetch_related("payment").order_by("id")
+    )
+
+    total = sum(
+        (charge.amount_inr for charge in charges),
+        Decimal("0.00"),
+    )
+
+    paid_total = sum(
+        (
+            charge.amount_inr
+            for charge in charges
+            if hasattr(charge, "payment")
+        ),
+        Decimal("0.00"),
+    )
+
+    return render(
+        request,
+        "gate/receipt.html",
+        {
+            "reservation": reservation,
+            "charges": charges,
+            "total": total,
+            "paid_total": paid_total,
+            "balance_due": total - paid_total,
+        },
+    )
+
