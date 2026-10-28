@@ -91,6 +91,7 @@ def register_walk_in(attendant, lot, registration_no, vehicle_type, now=None):
         )
     return reservation
 
+
 def _billable_hours(duration, minimum_one_hour=False):
     """Round a duration up to 30-minute blocks."""
     if duration.total_seconds() <= 0:
@@ -110,7 +111,7 @@ def _hourly_rate(reservation):
 
     if entry_time is None:
         raise ValidationError(
-            "The reservation has no recorded entry time. Check the vehicle in first."
+            {"__all__": "The reservation has no recorded entry time. Check the vehicle in first."}
         )
 
     entry_date = timezone.localtime(entry_time).date()
@@ -127,7 +128,7 @@ def _hourly_rate(reservation):
 
     if tariff is None:
         raise ValidationError(
-            "No applicable tariff exists for this parking lot and slot type."
+            {"__all__": "No applicable tariff exists for this parking lot and slot type."}
         )
 
     return tariff.hourly_rate_inr
@@ -138,48 +139,54 @@ def checkout_vehicle(query, attendant, now=None):
     FR-GATE-04: complete an Active reservation, calculate charges,
     record exit time, and create an audit entry atomically.
     """
+    if not can(attendant, Function.GATE_OPERATIONS):
+        raise ValidationError({"__all__": "Only Gate Attendants may check out vehicles."})
+
     now = now or timezone.now()
     query = query.strip()
 
     if not query:
-        raise ValidationError("Enter a booking reference or vehicle registration.")
+        raise ValidationError({"__all__": "Enter a booking reference or vehicle registration."})
 
     registration = normalise_registration(query)
 
     with transaction.atomic():
         reservation = (
-        Reservation.objects.select_for_update()
-        .select_related("slot__lot")
-        .filter(status=Reservation.Status.ACTIVE)
-        .filter(
-            Q(booking_ref__iexact=query)
-            | Q(vehicle_reg_no=registration)
-        )   
-        .first()
-    )
+            Reservation.objects.select_for_update()
+            .select_related("slot__lot")
+            .filter(status=Reservation.Status.ACTIVE)
+            .filter(Q(booking_ref__iexact=query) | Q(vehicle_reg_no=registration))
+            .first()
+        )
 
         if reservation is None:
             raise ValidationError(
-                "No Active reservation matches that booking reference or registration."
+                {"__all__": "No Active reservation matches that booking reference or registration."}
             )
 
         if reservation.entry_time is None:
-            raise ValidationError("This reservation has no recorded entry time.")
+            raise ValidationError({"__all__": "This reservation has no recorded entry time."})
 
         if now < reservation.entry_time:
-            raise ValidationError("Exit time cannot be earlier than entry time.")
+            raise ValidationError({"__all__": "Exit time cannot be earlier than entry time."})
 
         # Lock the reservation before calculating or recording any charges.
         if Charge.objects.filter(
             reservation=reservation,
             kind=Charge.Kind.PARKING,
         ).exists():
-            raise ValidationError("A parking charge has already been recorded.")
+            raise ValidationError({"__all__": "A parking charge has already been recorded."})
 
         rate = _hourly_rate(reservation)
 
         # The reserved end is the upper bound of the PostgreSQL time range.
         reserved_end = reservation.period.upper
+        if not reservation.is_walk_in and (
+            reserved_end is None or reserved_end < reservation.entry_time
+        ):
+            raise ValidationError(
+                {"__all__": "The reserved end cannot be before entry or missing."}
+            )
 
         if reservation.is_walk_in:
             parking_end = now
@@ -206,9 +213,9 @@ def checkout_vehicle(query, attendant, now=None):
             overstay_duration = now - (reserved_end + CHECKOUT_GRACE)
             overstay_hours = _billable_hours(overstay_duration)
 
-            overstay_amount = (
-                rate * OVERSTAY_MULTIPLIER * overstay_hours
-            ).quantize(Decimal("0.01"))
+            overstay_amount = (rate * OVERSTAY_MULTIPLIER * overstay_hours).quantize(
+                Decimal("0.01")
+            )
 
             if overstay_amount > 0:
                 overstay_charge = Charge.objects.create(
@@ -240,5 +247,3 @@ def checkout_vehicle(query, attendant, now=None):
         )
 
     return reservation
-
-

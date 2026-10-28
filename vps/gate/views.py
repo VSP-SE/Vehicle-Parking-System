@@ -14,7 +14,13 @@ from vps.accounts.roles import Function
 from vps.billing.models import Charge, Payment
 from vps.billing.services import record_payment, unpaid_charges
 from vps.gate.forms import CheckoutForm, WalkInForm
-from vps.gate.services import checkout_vehicle, register_walk_in
+from vps.gate.services import (
+    CHECKOUT_GRACE,
+    _billable_hours,
+    _hourly_rate,
+    checkout_vehicle,
+    register_walk_in,
+)
 from vps.reservations.models import Reservation
 
 
@@ -74,7 +80,7 @@ def walk_in(request):
 @require_http_methods(["GET", "POST"])
 def checkout(request):
     """FR-GATE-04: check out an active vehicle and display its receipt."""
-    form = CheckoutForm(request.POST or None)
+    form = CheckoutForm(request.POST if request.method == "POST" else None)
 
     if request.method == "POST" and form.is_valid():
         try:
@@ -102,9 +108,7 @@ def receipt(request, booking_ref):
         status=Reservation.Status.COMPLETED,
     )
 
-    charges = list(
-        reservation.charges.prefetch_related("payment").order_by("id")
-    )
+    charges = list(reservation.charges.prefetch_related("payment").order_by("id"))
 
     total = sum(
         (charge.amount_inr for charge in charges),
@@ -112,23 +116,31 @@ def receipt(request, booking_ref):
     )
 
     paid_total = sum(
-        (
-            charge.amount_inr
-            for charge in charges
-            if hasattr(charge, "payment")
-        ),
+        (charge.amount_inr for charge in charges if hasattr(charge, "payment")),
         Decimal("0.00"),
     )
+
+    parking_end = reservation.exit_time
+    if not reservation.is_walk_in:
+        parking_end = min(parking_end, reservation.period.upper)
+    parking_hours = _billable_hours(parking_end - reservation.entry_time, minimum_one_hour=True)
+    overstay_hours = Decimal("0.0")
+    if not reservation.is_walk_in:
+        overstay_hours = _billable_hours(
+            reservation.exit_time - (reservation.period.upper + CHECKOUT_GRACE)
+        )
 
     return render(
         request,
         "gate/receipt.html",
         {
             "reservation": reservation,
+            "parking_hours": parking_hours,
+            "overstay_hours": overstay_hours,
+            "hourly_rate": _hourly_rate(reservation),
             "charges": charges,
             "total": total,
             "paid_total": paid_total,
             "balance_due": total - paid_total,
         },
     )
-
