@@ -184,61 +184,41 @@ def expire_no_shows(now=None):
 
 
 
+LATE_CANCELLATION_WINDOW = timedelta(minutes=60)
+
 
 @transaction.atomic
-def cancel_reservation(*, driver, reservation_id):
-    """FR-RES-04: Cancel a driver's Reserved booking and apply any late fee."""
-    reservation = (
-        Reservation.objects.select_for_update()
-        .select_related("slot")
-        .get(pk=reservation_id, driver=driver)
-    )
-
+def cancel_reservation(*, driver, reservation_id, now=None):
+    """FR-RES-04: cancel a Driver's Reserved booking before it starts; Rs 30 if under 60 min."""
     if not can(driver, Function.OWN_RESERVATIONS):
-        raise ValidationError(
-            {"__all__": "Only Drivers may cancel their reservations."}
-        )
-
+        raise ValidationError({"__all__": "Only Drivers may cancel their reservations."})
+    reservation = Reservation.objects.select_for_update().get(pk=reservation_id, driver=driver)
     if reservation.status != Reservation.Status.RESERVED:
-        raise ValidationError(
-            {"__all__": "Only Reserved reservations can be cancelled."}
-        )
-
-    start_time = reservation.period.lower
-    now = timezone.now()
-
-    if start_time is None or now >= start_time:
+        raise ValidationError({"__all__": "Only Reserved reservations can be cancelled."})
+    now = now or timezone.now()
+    start = reservation.period.lower
+    if now >= start:
         raise ValidationError(
             {"__all__": "Reservations can only be cancelled before their start time."}
         )
-
     # Exactly 60 minutes before the start is still a free cancellation.
-    late = start_time - now < timedelta(minutes=60)
-
+    late = start - now < LATE_CANCELLATION_WINDOW
     if late:
-        # Add LATE_CANCELLATION to Charge.Kind in billing/models.py first.
         Charge.objects.create(
             reservation=reservation,
-            kind=Charge.Kind.LATE_CANCELLATION,
+            kind=Charge.Kind.LATE_CANCEL,
             amount_inr=LATE_CANCELLATION_CHARGE_INR,
         )
-
-    old_status = reservation.status
     reservation.status = Reservation.Status.CANCELLED
     reservation.save(update_fields=["status"])
-
     AuditLog.objects.create(
         actor=driver,
         action="reservation.cancelled",
         target=f"reservation:{reservation.booking_ref}",
-        before={"status": old_status},
+        before={"status": Reservation.Status.RESERVED},
         after={
             "status": Reservation.Status.CANCELLED,
-            "late_cancellation": late,
-            "charge_inr": str(
-                LATE_CANCELLATION_CHARGE_INR if late else Decimal("0.00")
-            ),
+            "late_cancellation_inr": str(LATE_CANCELLATION_CHARGE_INR) if late else "0.00",
         },
     )
-
     return reservation

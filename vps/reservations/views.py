@@ -1,6 +1,5 @@
 """Driver parking search, booking and confirmation pages."""
 
-from datetime import timedelta
 from urllib.parse import urlencode
 
 from django.contrib import messages
@@ -8,11 +7,11 @@ from django.core.exceptions import ValidationError
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
-from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
 from vps.accounts.permissions import function_required
 from vps.accounts.roles import Function, can
+from vps.billing.models import Charge
 from vps.reservations.forms import ReservationSearchForm
 from vps.reservations.models import Reservation
 from vps.reservations.services import cancel_reservation, free_slots, reserve, validate_window
@@ -99,6 +98,7 @@ def reservation_confirmation(request, booking_ref):
         },
     )
 
+
 @require_POST
 @function_required(Function.OWN_RESERVATIONS)
 def cancel_booking(request, reservation_id):
@@ -109,22 +109,18 @@ def cancel_booking(request, reservation_id):
             reservation_id=reservation_id,
         )
     except Reservation.DoesNotExist:
-        raise Http404("Reservation not found.")
+        raise Http404("Reservation not found.") from None
     except ValidationError as error:
         for message in error.messages:
             messages.error(request, message)
         return redirect("reservations:search")
 
-    if reservation.period.lower - timezone.now() < timedelta(minutes=60):
+    if reservation.charges.filter(kind=Charge.Kind.LATE_CANCEL).exists():
         messages.success(
             request,
             f"Booking {reservation.booking_ref} cancelled. "
             "A late-cancellation charge of Rs 30 has been recorded.",
         )
     else:
-        messages.success(
-            request,
-            f"Booking {reservation.booking_ref} cancelled free of charge.",
-        )
-
+        messages.success(request, f"Booking {reservation.booking_ref} cancelled free of charge.")
     return redirect("reservations:search")
