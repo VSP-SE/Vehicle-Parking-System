@@ -13,6 +13,7 @@ class Reservation(models.Model):
         COMPLETED = "Completed", "Completed"
         CANCELLED = "Cancelled", "Cancelled"
         EXPIRED = "Expired", "Expired"
+        LATE_CANCELLATION = "late_cancellation", "Late cancellation"
 
     booking_ref = models.CharField(max_length=15, unique=True)
     driver = models.ForeignKey(

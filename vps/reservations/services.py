@@ -25,6 +25,7 @@ MAX_WINDOW = timedelta(hours=24)
 MAX_START_AHEAD = timedelta(days=7)
 NO_SHOW_GRACE = timedelta(minutes=15)
 NO_SHOW_CHARGE_INR = Decimal("50.00")
+LATE_CANCELLATION_CHARGE_INR = Decimal("30.00")
 
 
 def validate_window(lot, start, end, now=None):
@@ -180,3 +181,64 @@ def expire_no_shows(now=None):
             )
             expired += 1
     return expired
+
+
+
+
+@transaction.atomic
+def cancel_reservation(*, driver, reservation_id):
+    """FR-RES-04: Cancel a driver's Reserved booking and apply any late fee."""
+    reservation = (
+        Reservation.objects.select_for_update()
+        .select_related("slot")
+        .get(pk=reservation_id, driver=driver)
+    )
+
+    if not can(driver, Function.OWN_RESERVATIONS):
+        raise ValidationError(
+            {"__all__": "Only Drivers may cancel their reservations."}
+        )
+
+    if reservation.status != Reservation.Status.RESERVED:
+        raise ValidationError(
+            {"__all__": "Only Reserved reservations can be cancelled."}
+        )
+
+    start_time = reservation.period.lower
+    now = timezone.now()
+
+    if start_time is None or now >= start_time:
+        raise ValidationError(
+            {"__all__": "Reservations can only be cancelled before their start time."}
+        )
+
+    # Exactly 60 minutes before the start is still a free cancellation.
+    late = start_time - now < timedelta(minutes=60)
+
+    if late:
+        # Add LATE_CANCELLATION to Charge.Kind in billing/models.py first.
+        Charge.objects.create(
+            reservation=reservation,
+            kind=Charge.Kind.LATE_CANCELLATION,
+            amount_inr=LATE_CANCELLATION_CHARGE_INR,
+        )
+
+    old_status = reservation.status
+    reservation.status = Reservation.Status.CANCELLED
+    reservation.save(update_fields=["status"])
+
+    AuditLog.objects.create(
+        actor=driver,
+        action="reservation.cancelled",
+        target=f"reservation:{reservation.booking_ref}",
+        before={"status": old_status},
+        after={
+            "status": Reservation.Status.CANCELLED,
+            "late_cancellation": late,
+            "charge_inr": str(
+                LATE_CANCELLATION_CHARGE_INR if late else Decimal("0.00")
+            ),
+        },
+    )
+
+    return reservation
