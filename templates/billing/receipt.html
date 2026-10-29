@@ -1,0 +1,140 @@
+
+{% extends "base.html" %}
+
+{% block title %}Parking Receipt | Vehicle Parking System{% endblock %}
+
+{% block content %}
+<section class="receipt-page" aria-labelledby="receipt-heading">
+  <div class="receipt-actions">
+    <a href="{% url 'reservations:search' %}" class="receipt-back">
+      Back to parking
+    </a>
+    <button type="button" class="receipt-print-button" onclick="window.print()">
+      Print receipt
+    </button>
+  </div>
+
+  <article class="receipt-card">
+    <header class="receipt-header">
+      <div class="receipt-brand-mark" aria-hidden="true">VPS</div>
+      <p class="receipt-eyebrow">VEHICLE PARKING SYSTEM</p>
+      <h1 id="receipt-heading">Payment Receipt</h1>
+      <p class="receipt-subtitle">Thank you for parking with us.</p>
+    </header>
+
+    <div class="receipt-status-row">
+      <span>Payment status</span>
+      <strong class="receipt-status">
+        {{ payment_status|default:"Paid" }}
+      </strong>
+    </div>
+
+    <section class="receipt-section" aria-labelledby="receipt-booking-heading">
+      <h2 id="receipt-booking-heading">Booking details</h2>
+
+      <dl class="receipt-details">
+        <div>
+          <dt>Booking reference</dt>
+          <dd>{{ reservation.booking_ref }}</dd>
+        </div>
+        <div>
+          <dt>Vehicle registration</dt>
+          <dd>{{ reservation.vehicle_reg_no }}</dd>
+        </div>
+        <div>
+          <dt>Parking lot</dt>
+          <dd>{{ reservation.slot.lot.name }}</dd>
+        </div>
+        <div>
+          <dt>Parking slot</dt>
+          <dd>{{ reservation.slot.code }}</dd>
+        </div>
+      </dl>
+    </section>
+
+    <section class="receipt-section" aria-labelledby="receipt-duration-heading">
+      <h2 id="receipt-duration-heading">Parking duration</h2>
+
+      <dl class="receipt-details">
+        <div>
+          <dt>Entry time</dt>
+          <dd>{{ reservation.entry_time|date:"d M Y, h:i A"|default:"—" }}</dd>
+        </div>
+        <div>
+          <dt>Exit time</dt>
+          <dd>{{ reservation.exit_time|date:"d M Y, h:i A"|default:"—" }}</dd>
+        </div>
+        <div>
+          <dt>Billable duration</dt>
+          <dd>{{ billable_duration|default:"—" }}</dd>
+        </div>
+        <div>
+          <dt>Hourly rate</dt>
+          <dd>
+            {% if hourly_rate != None %}₹{{ hourly_rate|floatformat:2 }}{% else %}—{% endif %}
+          </dd>
+        </div>
+      </dl>
+    </section>
+
+    <section class="receipt-section" aria-labelledby="receipt-charges-heading">
+      <h2 id="receipt-charges-heading">Itemised charges</h2>
+
+      <div class="receipt-table-wrapper">
+        <table class="receipt-table">
+          <thead>
+            <tr>
+              <th scope="col">Description</th>
+              <th scope="col" class="receipt-amount">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for charge in charges %}
+              <tr>
+                <td>{{ charge.get_kind_display|default:charge.kind }}</td>
+                <td class="receipt-amount">
+                  ₹{{ charge.amount_inr|floatformat:2 }}
+                </td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="2">No itemised charges available.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr>
+              <th scope="row">Total</th>
+              <th class="receipt-amount">₹{{ total_amount|floatformat:2 }}</th>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </section>
+
+    <section class="receipt-section receipt-payment" aria-labelledby="receipt-payment-heading">
+      <h2 id="receipt-payment-heading">Payment details</h2>
+
+      <dl class="receipt-details">
+        <div>
+          <dt>Payment method</dt>
+          <dd>{{ payment.get_method_display|default:payment.method|default:"—" }}</dd>
+        </div>
+        <div>
+          <dt>Payment date</dt>
+          <dd>{{ payment.paid_at|date:"d M Y, h:i A"|default:"—" }}</dd>
+        </div>
+        <div>
+          <dt>Payment status</dt>
+          <dd>{{ payment_status|default:"Paid" }}</dd>
+        </div>
+      </dl>
+    </section>
+
+    <footer class="receipt-footer">
+      <p>This receipt is your record of the parking charges shown above.</p>
+      <p>Vehicle Parking System</p>
+    </footer>
+  </article>
+</section>
+{% endblock %}
