@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block title %}Find Parking | Vehicle Parking System{% endblock %}
+
+{% block content %}
+<section class="search-page" aria-labelledby="search-heading">
+  <div class="search-intro">
+    <h1 id="search-heading">Find Available Parking</h1>
+    <p>
+      Choose your parking lot, vehicle and time window to see how many
+      suitable parking slots are available.
+    </p>
+  </div>
+
+  <form
+    method="get"
+    action="{{ search_url|default:'' }}"
+    class="search-form"
+    {% if search_url %}
+      hx-get="{{ search_url }}"
+      hx-target="#search-results"
+      hx-swap="innerHTML"
+      hx-indicator="#search-loading"
+    {% endif %}
+  >
+    <div class="field">
+      <label for="lot">Parking lot</label>
+      <select id="lot" name="lot" required>
+        <option value="">Choose a parking lot</option>
+        {% for lot in lots %}
+          <option
+            value="{{ lot.pk }}"
+            {% if selected_lot|stringformat:"s" == lot.pk|stringformat:"s" %}selected{% endif %}
+          >
+            {{ lot.name }} — {{ lot.address }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="field">
+      <label for="vehicle">Your vehicle</label>
+      <select id="vehicle" name="vehicle" required>
+        <option value="">Choose your vehicle</option>
+        {% for vehicle in vehicles %}
+          <option
+            value="{{ vehicle.pk }}"
+            {% if selected_vehicle|stringformat:"s" == vehicle.pk|stringformat:"s" %}selected{% endif %}
+          >
+            {{ vehicle.registration_no }} — {{ vehicle.get_vehicle_type_display }}
+            {% if vehicle.nickname %}({{ vehicle.nickname }}){% endif %}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="field">
+      <label for="start">Start date and time</label>
+      <input
+        id="start"
+        name="start"
+        type="datetime-local"
+        value="{{ start|default:'' }}"
+        required
+      >
+    </div>
+
+    <div class="field">
+      <label for="end">End date and time</label>
+      <input
+        id="end"
+        name="end"
+        type="datetime-local"
+        value="{{ end|default:'' }}"
+        required
+      >
+    </div>
+
+    <button type="submit">Search available slots</button>
+    <span id="search-loading" class="htmx-indicator" role="status">
+      Searching…
+    </span>
+  </form>
+
+  <div id="search-results" aria-live="polite">
+    {% include "slots/search_result.html" %}
+  </div>
+</section>
+{% endblock %}

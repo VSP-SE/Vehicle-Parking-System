@@ -95,6 +95,8 @@ EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", default=True)
 
 LOGIN_URL = "/accounts/login/"
+LOGIN_REDIRECT_URL = "/"
+LOGOUT_REDIRECT_URL = "/accounts/login/"
 
 LOGGING = {
     "version": 1,
@@ -104,3 +106,9 @@ LOGGING = {
         "vps.security": {"handlers": ["console"], "level": "WARNING"},
     },
 }
+
+PASSWORD_RESET_TIMEOUT = 1800  # 30 minutes
+DEFAULT_FROM_EMAIL = os.environ.get(
+    "DEFAULT_FROM_EMAIL",
+    EMAIL_HOST_USER or "webmaster@localhost",
+)

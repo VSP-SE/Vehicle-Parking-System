@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Walk-in · VPS{% endblock %}
+{% block content %}
+<h1>Register a walk-in vehicle</h1>
+<p>Allocate a suitable slot from now until the parking lot closes today.</p>
+<form method="post" action="{% url 'gate:walk_in' %}">
+  {% csrf_token %}
+  {{ form.non_field_errors }}
+  {% for field in form %}
+  <div class="field">
+    {{ field.label_tag }}
+    {{ field }}
+    {{ field.errors }}
+  </div>
+  {% endfor %}
+  <button type="submit">Register walk-in</button>
+</form>
+{% endblock %}

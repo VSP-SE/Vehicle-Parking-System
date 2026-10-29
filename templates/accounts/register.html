@@ -1,0 +1,106 @@
+
+{% extends "base.html" %}
+
+{% block title %}Create Driver Account | Vehicle Parking System{% endblock %}
+
+{% block content %}
+<section class="registration-page" aria-labelledby="registration-heading">
+  <div class="registration-card">
+    <h1 id="registration-heading">Create your Driver account</h1>
+    <p class="registration-intro">
+      Register to find and book available parking spaces.
+    </p>
+
+    {% if registration_error %}
+      <div class="message message-error" role="alert">
+        {{ registration_error }}
+      </div>
+    {% endif %}
+
+    {% if form.non_field_errors %}
+      <div class="message message-error" role="alert">
+        {{ form.non_field_errors }}
+      </div>
+    {% endif %}
+
+    <form method="post" action="{% url 'accounts:register' %}" class="registration-form">
+      {% csrf_token %}
+
+      <div class="field">
+        <label for="full_name">Full name</label>
+        <input
+          id="full_name"
+          name="full_name"
+          type="text"
+          minlength="2"
+          maxlength="100"
+          autocomplete="name"
+          value="{{ full_name|default:'' }}"
+          required
+          aria-describedby="full-name-help">
+        <small id="full-name-help">Enter 2–100 characters.</small>
+        {% if form.full_name.errors %}
+          <div class="field-error" role="alert">{{ form.full_name.errors }}</div>
+        {% endif %}
+      </div>
+
+      <div class="field">
+        <label for="email">Email address</label>
+        <input
+          id="email"
+          name="email"
+          type="email"
+          maxlength="254"
+          autocomplete="email"
+          value="{{ email|default:'' }}"
+          required>
+        {% if form.email.errors %}
+          <div class="field-error" role="alert">{{ form.email.errors }}</div>
+        {% endif %}
+      </div>
+
+      <div class="field">
+        <label for="mobile">Indian mobile number</label>
+        <input
+          id="mobile"
+          name="mobile"
+          type="tel"
+          inputmode="numeric"
+          pattern="[6-9][0-9]{9}"
+          minlength="10"
+          maxlength="10"
+          autocomplete="tel-national"
+          placeholder="9876543210"
+          value="{{ mobile|default:'' }}"
+          title="Enter 10 digits, starting with 6, 7, 8, or 9."
+          required>
+        <small>Enter 10 digits, starting with 6, 7, 8, or 9.</small>
+        {% if form.mobile.errors %}
+          <div class="field-error" role="alert">{{ form.mobile.errors }}</div>
+        {% endif %}
+      </div>
+
+      <div class="field">
+        <label for="password">Password</label>
+        <input
+          id="password"
+          name="password"
+          type="password"
+          autocomplete="new-password"
+          required>
+        {% if form.password.errors %}
+          <div class="field-error" role="alert">{{ form.password.errors }}</div>
+        {% endif %}
+      </div>
+
+      <button type="submit" class="registration-button">
+        Create Driver Account
+      </button>
+    </form>
+
+    <p class="registration-footnote">
+      Already registered? <a href="{% url 'accounts:login' %}">Sign in</a>.
+    </p>
+  </div>
+</section>
+{% endblock %}

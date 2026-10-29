@@ -1,9 +1,12 @@
 """Parking-lot business rules, shared by HTTP and non-HTTP callers."""
 
+from datetime import datetime
+
+from django.contrib.postgres.fields.ranges import DateTimeTZRange
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 
-from vps.lots.models import Lot
+from vps.lots.models import Lot, Slot, SlotBlock
 
 DUPLICATE_MESSAGE = "A parking lot with this name and address already exists. Change either field."
 REQUIRED_MESSAGES = {
@@ -82,3 +85,118 @@ def restore_lot(lot):
     lot.is_archived = False
     lot.save(update_fields=["is_archived"])
     return lot
+# ---------------------------------------------------------------------------
+# Slot creation (FR-LOT-02 / #31)
+# ---------------------------------------------------------------------------
+
+DUPLICATE_SLOT_MESSAGE = "A slot with this code already exists in the lot."
+
+
+def create_slot(*, lot: Lot, code: str, slot_type: str, distance_rank: int) -> Slot:
+    """
+    Create a slot in the given lot.
+
+    Enforces:
+    - code is required and unique within the lot
+    - slot_type is one of the allowed choices
+    - distance_rank is a positive integer (≥ 1)
+    """
+    code = (code or "").strip().upper()
+    errors = {}
+
+    if not code:
+        errors["code"] = "Enter a code for the slot."
+    if distance_rank is None or not isinstance(distance_rank, int) or distance_rank < 1:
+        errors["distance_rank"] = (
+            "Distance rank must be a positive integer (1 is nearest to the exit)."
+        )
+
+    if errors:
+        raise ValidationError(errors)
+
+    slot = Slot(
+        lot=lot,
+        code=code,
+        slot_type=slot_type,
+        distance_rank=distance_rank,
+    )
+
+    # Validate field-level rules (choices, max_length, etc.) without DB constraints
+    slot.full_clean(validate_constraints=False)
+
+    # Friendly pre-check
+    if Slot.objects.filter(lot=lot, code=code).exists():
+        raise ValidationError({"code": DUPLICATE_SLOT_MESSAGE})
+
+    try:
+        with transaction.atomic():
+            slot.save()
+    except IntegrityError as error:
+        constraint = getattr(
+            getattr(error.__cause__, "diag", None), "constraint_name", None
+        )
+        if constraint == "slot_lot_code_uniq":
+            raise ValidationError({"code": DUPLICATE_SLOT_MESSAGE}) from error
+        if constraint == "slot_distance_rank_positive":
+            raise ValidationError(
+                {
+                    "distance_rank": (
+                        "Distance rank must be a positive integer "
+                        "(1 is nearest to the exit)."
+                    )
+                }
+            ) from error
+        raise
+
+    return slot
+OVERLAPPING_BLOCK_MESSAGE = "This slot already has a block that overlaps the requested period."
+
+
+def block_slot(
+    *,
+    slot: Slot,
+    starts_at: datetime,
+    ends_at: datetime,
+    reason: str,
+) -> SlotBlock:
+    """
+    Block a slot for the given period with a reason (FR-LOT-03).
+
+    Raises ValidationError if:
+    - the period is invalid (end <= start)
+    - reason is empty
+    - the period overlaps an existing block on the same slot
+    """
+    reason = (reason or "").strip()
+    errors = {}
+
+    if not reason:
+        errors["reason"] = "Enter a reason for the block."
+    if starts_at is None or ends_at is None:
+        errors["period"] = "Both start and end times are required."
+    elif ends_at <= starts_at:
+        errors["period"] = "End time must be later than start time."
+
+    if errors:
+        raise ValidationError(errors)
+
+    period = DateTimeTZRange(starts_at, ends_at)
+
+    # Friendly pre-check for overlapping blocks
+    if SlotBlock.objects.filter(slot=slot, period__overlap=period).exists():
+        raise ValidationError({"period": OVERLAPPING_BLOCK_MESSAGE})
+
+    block = SlotBlock(slot=slot, period=period, reason=reason)
+
+    try:
+        with transaction.atomic():
+            block.save()
+    except IntegrityError as error:
+        constraint = getattr(
+            getattr(error.__cause__, "diag", None), "constraint_name", None
+        )
+        if constraint == "slotblock_period_no_overlap":
+            raise ValidationError({"period": OVERLAPPING_BLOCK_MESSAGE}) from error
+        raise
+
+    return block
