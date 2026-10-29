@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block title %}Gate Operations | Vehicle Parking System{% endblock %}
+
+{% block content %}
+<section class="gate-page" aria-labelledby="gate-heading">
+  <header class="gate-heading">
+    <div>
+      <h1 id="gate-heading">Gate Operations</h1>
+      <p>Process arrivals and departures from one screen.</p>
+    </div>
+    <span class="gate-status">Attendant Console</span>
+  </header>
+
+  {% if gate_error %}
+    <div class="message message-error" role="alert">{{ gate_error }}</div>
+  {% endif %}
+
+  {% if gate_message %}
+    <div class="message message-info" role="status">{{ gate_message }}</div>
+  {% endif %}
+
+  <nav class="gate-modes" aria-label="Gate operation">
+    <a href="#check-in" class="gate-mode">Check-in</a>
+    <a href="#check-out" class="gate-mode">Check-out</a>
+    <a href="#walk-in" class="gate-mode">Walk-in</a>
+  </nav>
+
+  <div class="gate-panels">
+    <section id="check-in" class="gate-panel" aria-labelledby="check-in-heading">
+      <h2 id="check-in-heading">Vehicle check-in</h2>
+      <p>Find a reservation to begin arrival processing.</p>
+      <form method="post" action="{{ checkin_url|default:'' }}" class="gate-form">
+        {% csrf_token %}
+        <input type="hidden" name="operation" value="checkin">
+        <label for="checkin-reference">Booking reference or registration</label>
+        <input
+          id="checkin-reference"
+          name="reference"
+          type="text"
+          autocomplete="off"
+          placeholder="Enter or scan reference"
+          required>
+        <button type="submit" {% if not checkin_url %}disabled{% endif %}>
+          Check in
+        </button>
+      </form>
+    </section>
+
+    <section id="check-out" class="gate-panel" aria-labelledby="check-out-heading">
+      <h2 id="check-out-heading">Vehicle check-out</h2>
+      <p>Find an active parking session to begin departure processing.</p>
+      <form method="post" action="{{ checkout_url|default:'' }}" class="gate-form">
+        {% csrf_token %}
+        <input type="hidden" name="operation" value="checkout">
+        <label for="checkout-reference">Booking reference or registration</label>
+        <input
+          id="checkout-reference"
+          name="reference"
+          type="text"
+          autocomplete="off"
+          placeholder="Enter or scan reference"
+          required>
+        <button type="submit" {% if not checkout_url %}disabled{% endif %}>
+          Check out
+        </button>
+      </form>
+    </section>
+
+    <section id="walk-in" class="gate-panel" aria-labelledby="walk-in-heading">
+      <h2 id="walk-in-heading">Walk-in vehicle</h2>
+      <p>Enter vehicle details for a driver arriving without a reservation.</p>
+      <form method="post" action="{{ walkin_url|default:'' }}" class="gate-form">
+        {% csrf_token %}
+        <input type="hidden" name="operation" value="walkin">
+        <label for="walkin-registration">Vehicle registration</label>
+        <input
+          id="walkin-registration"
+          name="registration_no"
+          type="text"
+          maxlength="13"
+          autocomplete="off"
+          placeholder="e.g. KA01AB1234"
+          required>
+
+        <label for="walkin-type">Vehicle type</label>
+        <select id="walkin-type" name="vehicle_type" required>
+          <option value="">Choose vehicle type</option>
+          <option value="Car">Car</option>
+          <option value="TwoWheeler">Two-wheeler</option>
+          <option value="EV">Electric vehicle</option>
+        </select>
+
+        <button type="submit" {% if not walkin_url %}disabled{% endif %}>
+          Register walk-in
+        </button>
+      </form>
+    </section>
+  </div>
+
+  <p class="gate-footnote">
+    Keyboard tip: use Tab to move between fields and Enter to submit a form.
+  </p>
+</section>
+{% endblock %}

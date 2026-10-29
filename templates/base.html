@@ -512,6 +512,139 @@
   }
 }
 
+.gate-page {
+  max-width: 64rem;
+  margin: 1.5rem auto;
+}
+
+.gate-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.gate-heading h1 {
+  margin-bottom: .25rem;
+}
+
+.gate-heading p,
+.gate-panel p,
+.gate-footnote {
+  color: #4b5563;
+}
+
+.gate-status {
+  padding: .4rem .7rem;
+  border-radius: 999px;
+  background: #dcfce7;
+  color: #166534;
+  font-size: .875rem;
+}
+
+.gate-modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .75rem;
+  margin-bottom: 1.25rem;
+}
+
+.gate-mode {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: .6rem 1rem;
+  border: 1px solid #9ca3af;
+  border-radius: .4rem;
+  background: #fff;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.gate-panels {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.gate-panel {
+  min-width: 0;
+  padding: 1.25rem;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: .65rem;
+  scroll-margin-top: 1rem;
+}
+
+.gate-panel:last-child {
+  grid-column: 1 / -1;
+}
+
+.gate-panel h2 {
+  margin-top: 0;
+  font-size: 1.2rem;
+}
+
+.gate-form {
+  display: grid;
+  gap: .65rem;
+}
+
+.gate-form label {
+  font-weight: 600;
+}
+
+.gate-form input,
+.gate-form select {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #9ca3af;
+  border-radius: .35rem;
+}
+
+.gate-form button {
+  width: 100%;
+  margin-top: .35rem;
+  background: #166534;
+  color: #fff;
+  font-weight: 600;
+}
+
+.gate-form button:disabled {
+  background: #9ca3af;
+  border-color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.gate-mode:focus-visible,
+.gate-form input:focus-visible,
+.gate-form select:focus-visible,
+.gate-form button:focus-visible {
+  outline: 3px solid #2563eb;
+  outline-offset: 3px;
+}
+
+.gate-footnote {
+  margin-top: 1.25rem;
+  font-size: .9rem;
+}
+
+@media (max-width: 640px) {
+  .gate-panels {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .gate-panel:last-child {
+    grid-column: auto;
+  }
+
+  .gate-panel {
+    padding: 1rem;
+  }
+}
+
 .tariff-page {
   max-width: 64rem;
   margin: 1.5rem auto;
