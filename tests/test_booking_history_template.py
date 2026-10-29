@@ -1,4 +1,3 @@
-
 from datetime import datetime
 from types import SimpleNamespace
 
@@ -85,5 +84,5 @@ def test_booking_history_has_pagination_navigation_when_multiple_pages():
 
     assert 'aria-label="Booking history pages"' in rendered
     assert "Page 1 of 2" in rendered
-    assert '?page=2' in rendered
+    assert "?page=2" in rendered
     assert "Next" in rendered
