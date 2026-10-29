@@ -152,7 +152,7 @@
     padding: .85rem;
   }
 }
-    
+
 .auth-page {
   max-width: 30rem;
   margin: 2.5rem auto;
@@ -210,7 +210,7 @@
     padding: 1rem;
   }
 }
-    
+
 .vehicle-page {
   max-width: 38rem;
   margin: 2rem auto;
@@ -275,7 +275,7 @@
     padding: 1rem;
   }
 }
-    
+
 .registration-page {
   max-width: 34rem;
   margin: 2rem auto;
@@ -347,7 +347,7 @@
     padding: 1rem;
   }
 }
-    
+
 .booking-page {
   max-width: 38rem;
   margin: 2rem auto;
@@ -443,6 +443,212 @@
   .booking-detail strong {
     text-align: left;
   }
+
+
+.tariff-page {
+  max-width: 64rem;
+  margin: 1.5rem auto;
+}
+
+.tariff-heading {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.tariff-heading h1 {
+  margin: 0 0 .4rem;
+  font-size: 1.9rem;
+}
+
+.tariff-heading p,
+.tariff-muted,
+.tariff-footnote {
+  color: #4b5563;
+}
+
+.tariff-eyebrow {
+  margin: 0 0 .4rem;
+  color: #166534 !important;
+  font-size: .75rem;
+  font-weight: 700;
+  letter-spacing: .12em;
+}
+
+.tariff-badge,
+.tariff-count {
+  display: inline-block;
+  padding: .4rem .7rem;
+  border-radius: 999px;
+  background: #dcfce7;
+  color: #166534;
+  font-size: .85rem;
+  font-weight: 600;
+}
+
+.tariff-card {
+  margin-bottom: 1.25rem;
+  padding: 1.4rem;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: .65rem;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 3%);
+}
+
+.tariff-card h2 {
+  margin-top: 0;
+  margin-bottom: .35rem;
+  font-size: 1.25rem;
+}
+
+.tariff-muted {
+  margin-top: 0;
+  font-size: .95rem;
+}
+
+.tariff-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.1rem;
+  margin-top: 1.25rem;
+}
+
+.tariff-field {
+  display: grid;
+  align-content: start;
+  gap: .4rem;
+  min-width: 0;
+}
+
+.tariff-field label {
+  font-weight: 600;
+}
+
+.tariff-field input,
+.tariff-field select {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #9ca3af;
+  border-radius: .35rem;
+  background: #fff;
+}
+
+.tariff-field small {
+  color: #4b5563;
+}
+
+.tariff-rate-input {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+}
+
+.tariff-rate-input span {
+  font-weight: 700;
+}
+
+.tariff-rate-input input {
+  flex: 1;
+}
+
+.tariff-form-actions {
+  grid-column: 1 / -1;
+}
+
+.tariff-form-actions button {
+  width: 100%;
+  background: #166534;
+  color: #fff;
+  font-weight: 600;
+}
+
+.tariff-form-actions button:disabled {
+  background: #9ca3af;
+  border-color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.tariff-field input:focus-visible,
+.tariff-field select:focus-visible,
+.tariff-form-actions button:focus-visible {
+  outline: 3px solid #2563eb;
+  outline-offset: 3px;
+}
+
+.tariff-notice {
+  margin-bottom: 0;
+  padding: .75rem;
+  background: #fef3c7;
+  color: #854d0e;
+  border-radius: .35rem;
+  font-size: .9rem;
+}
+
+.tariff-list-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+}
+
+.tariff-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.tariff-table {
+  min-width: 34rem;
+  margin-top: .75rem;
+}
+
+.tariff-table th {
+  background: #f3f4f6;
+  font-size: .9rem;
+}
+
+.tariff-table td {
+  overflow-wrap: anywhere;
+}
+
+.tariff-empty {
+  margin-top: .75rem;
+  padding: 1.5rem 1rem;
+  text-align: center;
+  background: #f9fafb;
+  border: 1px dashed #d1d5db;
+  border-radius: .4rem;
+}
+
+.tariff-empty h3 {
+  margin-top: 0;
+}
+
+.tariff-footnote {
+  font-size: .9rem;
+}
+
+@media (max-width: 600px) {
+  .tariff-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tariff-form-actions {
+    grid-column: auto;
+  }
+
+  .tariff-card {
+    padding: 1rem;
+  }
+
+  .tariff-heading h1 {
+    font-size: 1.55rem;
+  }
+}
+
 }
   </style>
 </head>
