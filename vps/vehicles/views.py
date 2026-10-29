@@ -7,6 +7,7 @@ from django.views.decorators.http import require_http_methods
 
 from vps.accounts.permissions import function_required
 from vps.accounts.roles import Function
+from vps.billing.services import unpaid_total
 from vps.vehicles import services
 from vps.vehicles.forms import VehicleForm
 from vps.vehicles.models import Vehicle
@@ -36,6 +37,7 @@ def register(request):
             "vehicle_count": count,
             "vehicle_limit_reached": count >= 5,
             "vehicle_error": form.non_field_errors(),
+            "unpaid_total": unpaid_total(request.user),
             **{
                 field: form[field].value()
                 for field in ("registration_no", "vehicle_type", "nickname")
