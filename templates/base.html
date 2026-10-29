@@ -152,7 +152,7 @@
     padding: .85rem;
   }
 }
-    
+
 .auth-page {
   max-width: 30rem;
   margin: 2.5rem auto;
@@ -210,7 +210,7 @@
     padding: 1rem;
   }
 }
-    
+
 .vehicle-page {
   max-width: 38rem;
   margin: 2rem auto;
@@ -275,7 +275,7 @@
     padding: 1rem;
   }
 }
-    
+
 .registration-page {
   max-width: 34rem;
   margin: 2rem auto;
@@ -347,7 +347,7 @@
     padding: 1rem;
   }
 }
-    
+
 .booking-page {
   max-width: 38rem;
   margin: 2rem auto;
@@ -443,6 +443,214 @@
   .booking-detail strong {
     text-align: left;
   }
+
+
+.history-page {
+  max-width: 68rem;
+  margin: 1.5rem auto;
+}
+
+.history-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.history-heading h1 {
+  margin: 0 0 .4rem;
+  font-size: 1.9rem;
+}
+
+.history-heading p,
+.history-list-heading p,
+.history-footnote {
+  color: #4b5563;
+}
+
+.history-eyebrow {
+  margin: 0 0 .4rem;
+  color: #166534 !important;
+  font-size: .75rem;
+  font-weight: 700;
+  letter-spacing: .12em;
+}
+
+.history-new-booking {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: .65rem 1rem;
+  border: 1px solid #166534;
+  border-radius: .4rem;
+  background: #166534;
+  color: #fff;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.history-card {
+  padding: 1.4rem;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: .65rem;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 3%);
+}
+
+.history-list-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  margin-bottom: 1rem;
+}
+
+.history-list-heading h2 {
+  margin: 0 0 .3rem;
+  font-size: 1.25rem;
+}
+
+.history-list-heading p {
+  margin: 0;
+  font-size: .95rem;
+}
+
+.history-count {
+  padding: .4rem .7rem;
+  border-radius: 999px;
+  background: #dcfce7;
+  color: #166534;
+  font-size: .85rem;
+  font-weight: 600;
+}
+
+.history-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.history-table {
+  min-width: 58rem;
+}
+
+.history-table th {
+  background: #f3f4f6;
+  font-size: .85rem;
+  white-space: nowrap;
+}
+
+.history-table td {
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.history-window {
+  display: grid;
+  gap: .2rem;
+  font-size: .9rem;
+}
+
+.history-window-separator {
+  color: #6b7280;
+  font-size: .8rem;
+}
+
+.history-state {
+  display: inline-block;
+  padding: .3rem .55rem;
+  border-radius: 999px;
+  background: #f3f4f6;
+  color: #374151;
+  font-size: .8rem;
+  font-weight: 600;
+}
+
+.history-charges {
+  display: grid;
+  gap: .35rem;
+  padding-left: 1rem;
+  margin: 0;
+  font-size: .85rem;
+}
+
+.history-no-charge {
+  color: #6b7280;
+  font-size: .85rem;
+}
+
+.history-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  padding-top: 1.25rem;
+  margin-top: 1rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.history-pagination a,
+.history-page-disabled {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: .5rem .85rem;
+  border: 1px solid #d1d5db;
+  border-radius: .35rem;
+  text-decoration: none;
+}
+
+.history-page-disabled {
+  color: #9ca3af;
+  background: #f9fafb;
+}
+
+.history-page-number {
+  font-size: .9rem;
+  font-weight: 600;
+}
+
+.history-pagination a:focus-visible,
+.history-new-booking:focus-visible {
+  outline: 3px solid #2563eb;
+  outline-offset: 3px;
+}
+
+.history-empty {
+  padding: 2rem 1rem;
+  text-align: center;
+  background: #f9fafb;
+  border: 1px dashed #d1d5db;
+  border-radius: .4rem;
+}
+
+.history-empty h3 {
+  margin-top: 0;
+}
+
+.history-footnote {
+  font-size: .9rem;
+}
+
+@media (max-width: 600px) {
+  .history-heading h1 {
+    font-size: 1.55rem;
+  }
+
+  .history-card {
+    padding: 1rem;
+  }
+
+  .history-heading .history-new-booking {
+    width: 100%;
+  }
+}
+
 }
   </style>
 </head>
