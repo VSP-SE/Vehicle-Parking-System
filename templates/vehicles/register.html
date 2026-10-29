@@ -4,9 +4,38 @@
 {% block title %}Add a Vehicle | Vehicle Parking System{% endblock %}
 
 {% block content %}
+
+<section class="balance-card" aria-labelledby="balance-heading">
+  <div class="balance-card__content">
+    <p class="balance-card__eyebrow">YOUR ACCOUNT</p>
+    <h2 id="balance-heading">Outstanding balance</h2>
+
+    {% if unpaid_total != None %}
+      <p class="balance-card__amount">₹{{ unpaid_total|floatformat:2 }}</p>
+
+      {% if unpaid_total > 0 %}
+        <p class="balance-card__message">
+          You have unpaid parking charges. Please settle them before your next booking.
+        </p>
+      {% else %}
+        <p class="balance-card__message">
+          You're all caught up! No outstanding charges.
+        </p>
+      {% endif %}
+    {% else %}
+      <p class="balance-card__message">
+        Your outstanding balance will appear here.
+      </p>
+    {% endif %}
+  </div>
+
+  <span class="balance-card__icon" aria-hidden="true">₹</span>
+</section>
+
 <section class="vehicle-page" aria-labelledby="vehicle-heading">
   <div class="vehicle-card">
     <h1 id="vehicle-heading">Add a vehicle</h1>
+
     <p class="vehicle-intro">
       Register your vehicle to book suitable parking slots.
     </p>
@@ -83,16 +112,20 @@
         <button type="submit" class="vehicle-button">Add Vehicle</button>
       </form>
     {% endif %}
+
     {% if vehicles %}
       <section aria-labelledby="your-vehicles-heading">
         <h2 id="your-vehicles-heading">Your vehicles</h2>
         <ul>
           {% for vehicle in vehicles %}
-            <li>{{ vehicle.registration_no }} — {{ vehicle.get_vehicle_type_display }}{% if vehicle.nickname %} ({{ vehicle.nickname }}){% endif %}</li>
+            <li>
+              {{ vehicle.registration_no }} — {{ vehicle.get_vehicle_type_display }}{% if vehicle.nickname %} ({{ vehicle.nickname }}){% endif %}
+            </li>
           {% endfor %}
         </ul>
       </section>
     {% endif %}
   </div>
 </section>
+
 {% endblock %}
