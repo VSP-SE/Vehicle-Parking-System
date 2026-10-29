@@ -143,6 +143,7 @@ def manage_accessible_permit(request, user_id):
         request, "accounts/manage_accessible_permit.html", {"driver": driver, "form": form}
     )
 
+
 class PasswordResetView(auth_views.PasswordResetView):
     template_name = "accounts/password_reset_form.html"
     email_template_name = "accounts/password_reset_email.html"

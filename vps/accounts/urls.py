@@ -16,7 +16,8 @@ urlpatterns = [
         "staff/drivers/<int:user_id>/accessible-permit/",
         views.manage_accessible_permit,
         name="manage_accessible_permit",
-    ),path(
+    ),
+    path(
         "password-reset/",
         views.PasswordResetView.as_view(),
         name="password_reset",
