@@ -24,6 +24,94 @@ from vps.vehicles.services import normalise_registration, validate_registration
 CHECKOUT_GRACE = timedelta(minutes=10)
 OVERSTAY_MULTIPLIER = Decimal("1.5")
 
+CHECKIN_WINDOW = timedelta(minutes=15)
+
+
+def check_in_vehicle(query: str, attendant, now=None):
+    """
+    FR-GATE-01 / FR-GATE-02: Check in a Reserved reservation.
+
+    - Allowed only for status = Reserved
+    - Window: 15 minutes before → 15 minutes after the reservation start
+    - On success: status → Active, entry_time recorded
+    - Too early → raise ValidationError with the earliest allowed time
+    """
+    if not can(attendant, Function.GATE_OPERATIONS):
+        raise ValidationError({"__all__": "Only Gate Attendants may check in vehicles."})
+
+    now = now or timezone.now()
+    query = (query or "").strip()
+    if not query:
+        raise ValidationError({"__all__": "Enter a booking reference or vehicle registration."})
+
+    registration = normalise_registration(query)
+
+    with transaction.atomic():
+        reservation = (
+            Reservation.objects.select_for_update()
+            .select_related("slot__lot")
+            .filter(status=Reservation.Status.RESERVED)
+            .filter(
+                Q(booking_ref__iexact=query) | Q(vehicle_reg_no=registration)
+            )
+            .first()
+        )
+
+        if reservation is None:
+            raise ValidationError(
+                {
+                    "__all__": (
+                        "No Reserved reservation matches that booking reference "
+                        "or registration number."
+                    )
+                }
+            )
+
+        start = reservation.period.lower
+        earliest = start - CHECKIN_WINDOW
+        latest = start + CHECKIN_WINDOW
+
+        if now < earliest:
+            # FR-GATE-02 – too early
+            local_earliest = timezone.localtime(earliest)
+            raise ValidationError(
+                {
+                    "__all__": (
+                        f"Too early to check in. "
+                        f"Earliest allowed time is {local_earliest:%H:%M}."
+                    )
+                }
+            )
+
+        if now > latest:
+            raise ValidationError(
+                {
+                    "__all__": (
+                        "The check-in window has closed. "
+                        "This reservation can no longer be activated."
+                    )
+                }
+            )
+
+        # Success – activate
+        reservation.status = Reservation.Status.ACTIVE
+        reservation.entry_time = now
+        reservation.save(update_fields=["status", "entry_time"])
+
+        AuditLog.objects.create(
+            actor=attendant,
+            action="reservation.checked_in",
+            target=f"reservation:{reservation.booking_ref}",
+            before={"status": Reservation.Status.RESERVED},
+            after={
+                "status": Reservation.Status.ACTIVE,
+                "entry_time": now.isoformat(),
+                "slot": reservation.slot.code,
+                "vehicle_reg_no": reservation.vehicle_reg_no,
+            },
+        )
+
+    return reservation
 
 def register_walk_in(attendant, lot, registration_no, vehicle_type, now=None):
     """Allocate a suitable slot until today's closing and record the arrival atomically."""

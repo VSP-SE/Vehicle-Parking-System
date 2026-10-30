@@ -1,0 +1,116 @@
+"""FR-GATE-01 / FR-GATE-02 – Check in a booked vehicle (#46)."""
+
+from datetime import timedelta
+
+import pytest
+from django.core.exceptions import ValidationError
+from django.utils import timezone
+
+from vps.accounts.models import User
+from vps.gate.services import check_in_vehicle
+from vps.lots.models import Lot, Slot
+from vps.reservations.models import Reservation
+
+pytestmark = pytest.mark.django_db
+
+
+@pytest.fixture
+def attendant():
+    return User.objects.create_user(
+        email="attendant@example.com",
+        password="password",
+        role=User.Role.ATTENDANT,
+    )
+
+
+@pytest.fixture
+def driver():
+    return User.objects.create_user(
+        email="driver@example.com",
+        password="password",
+        role=User.Role.DRIVER,
+    )
+
+
+@pytest.fixture
+def slot():
+    lot = Lot.objects.create(
+        name="Lot A", address="1 Ring Road", opens_at="06:00", closes_at="23:00"
+    )
+    return Slot.objects.create(lot=lot, code="A-01", distance_rank=1)
+
+
+def make_reservation(driver, slot, start, status=Reservation.Status.RESERVED):
+    end = start + timedelta(hours=2)
+    return Reservation.objects.create(
+        booking_ref=f"VPS-TEST-{timezone.now():%H%M%S}",
+        driver=driver,
+        vehicle_reg_no="KA01AB1234",
+        slot=slot,
+        period=(start, end),
+        status=status,
+    )
+
+
+def test_check_in_success_within_window(attendant, driver, slot):
+    start = timezone.now() + timedelta(minutes=5)
+    reservation = make_reservation(driver, slot, start)
+
+    result = check_in_vehicle(reservation.booking_ref, attendant)
+
+    assert result.status == Reservation.Status.ACTIVE
+    assert result.entry_time is not None
+    reservation.refresh_from_db()
+    assert reservation.status == Reservation.Status.ACTIVE
+
+
+def test_check_in_by_registration_number(attendant, driver, slot):
+    start = timezone.now() + timedelta(minutes=5)
+    reservation = make_reservation(driver, slot, start)
+
+    result = check_in_vehicle("KA01AB1234", attendant)
+    assert result.pk == reservation.pk
+    assert result.status == Reservation.Status.ACTIVE
+
+
+def test_check_in_too_early(attendant, driver, slot):
+    start = timezone.now() + timedelta(minutes=30)
+    reservation = make_reservation(driver, slot, start)
+
+    with pytest.raises(ValidationError) as exc:
+        check_in_vehicle(reservation.booking_ref, attendant)
+
+    assert "Too early" in str(exc.value)
+    assert "Earliest allowed time" in str(exc.value)
+    reservation.refresh_from_db()
+    assert reservation.status == Reservation.Status.RESERVED
+
+
+def test_check_in_window_closed(attendant, driver, slot):
+    start = timezone.now() - timedelta(minutes=20)
+    reservation = make_reservation(driver, slot, start)
+
+    with pytest.raises(ValidationError) as exc:
+        check_in_vehicle(reservation.booking_ref, attendant)
+
+    assert "check-in window has closed" in str(exc.value).lower()
+
+
+def test_check_in_rejects_non_reserved(attendant, driver, slot):
+    start = timezone.now() + timedelta(minutes=5)
+    reservation = make_reservation(driver, slot, start, status=Reservation.Status.ACTIVE)
+
+    with pytest.raises(ValidationError) as exc:
+        check_in_vehicle(reservation.booking_ref, attendant)
+
+    assert "No Reserved reservation" in str(exc.value)
+
+
+def test_check_in_requires_attendant_role(driver, slot):
+    start = timezone.now() + timedelta(minutes=5)
+    reservation = make_reservation(driver, slot, start)
+
+    with pytest.raises(ValidationError) as exc:
+        check_in_vehicle(reservation.booking_ref, driver)  # driver is not attendant
+
+    assert "Only Gate Attendants" in str(exc.value)
