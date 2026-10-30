@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Staff | VPS{% endblock %}
+
+{% block content %}
+<h1>Manage Staff Accounts</h1>
+
+<p>Deactivate or reactivate Gate Attendant and Lot Administrator accounts.</p>
+
+<p>
+    <a href="{% url 'accounts:create_staff' %}">Create Staff Account</a>
+</p>
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Role</th>
+            <th>Status</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+
+    <tbody>
+        {% for staff in staff_members %}
+        <tr>
+            <td>{{ staff.full_name }}</td>
+            <td>{{ staff.email }}</td>
+            <td>{{ staff.get_role_display }}</td>
+
+            <td>
+                {% if staff.is_active %}
+                    Active
+                {% else %}
+                    Deactivated
+                {% endif %}
+            </td>
+
+            <td>
+                {% if staff.is_active %}
+                    <form method="post"
+                          action="{% url 'accounts:deactivate_staff' staff.pk %}"
+                          class="inline">
+                        {% csrf_token %}
+                        <button type="submit">Deactivate</button>
+                    </form>
+                {% else %}
+                    <form method="post"
+                          action="{% url 'accounts:reactivate_staff' staff.pk %}"
+                          class="inline">
+                        {% csrf_token %}
+                        <button type="submit">Reactivate</button>
+                    </form>
+                {% endif %}
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="5">No staff accounts found.</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
