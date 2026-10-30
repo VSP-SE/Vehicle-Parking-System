@@ -1,128 +1,129 @@
-
 {% extends "base.html" %}
 
 {% block title %}My Bookings | Vehicle Parking System{% endblock %}
 
 {% block content %}
 <section class="history-page" aria-labelledby="history-heading">
-
-  <header class="history-header">
+  <header class="history-heading">
     <div>
+      <p class="history-eyebrow">YOUR PARKING ACTIVITY</p>
       <h1 id="history-heading">My Bookings</h1>
-      <p>View your past and upcoming parking reservations.</p>
+      <p>View your upcoming and past parking reservations.</p>
     </div>
-
-    <a href="{% url 'reservations:search' %}" class="button">
-      Book Parking
+    <a class="history-new-booking" href="{% url 'reservations:search' %}">
+      Find parking
     </a>
   </header>
 
-  <p class="history-count">
-    {{ page_obj.paginator.count }} booking{{ page_obj.paginator.count|pluralize }}
-  </p>
-
-  {% if reservations %}
-    <div class="history-list">
-      {% for reservation in reservations %}
-        <article class="history-card">
-
-          <div class="history-card-header">
-            <div>
-              <span class="history-label">Booking Reference</span>
-              <h2>{{ reservation.booking_ref }}</h2>
-            </div>
-
-            <span class="history-status">
-              {{ reservation.get_status_display }}
-            </span>
-          </div>
-
-          <div class="history-details">
-            <div>
-              <span class="history-label">Parking Lot</span>
-              <p>{{ reservation.slot.lot.name }}</p>
-            </div>
-
-            <div>
-              <span class="history-label">Parking Slot</span>
-              <p>{{ reservation.slot.code }}</p>
-            </div>
-
-            <div>
-              <span class="history-label">Vehicle</span>
-              <p>{{ reservation.vehicle_reg_no }}</p>
-            </div>
-
-            <div>
-              <span class="history-label">Booking Window</span>
-              <p>
-                {{ reservation.period.lower|date:"d M Y, h:i A" }}
-                –
-                {{ reservation.period.upper|date:"d M Y, h:i A" }}
-              </p>
-            </div>
-          </div>
-
-          <div class="history-charges">
-            <h3>Charges</h3>
-
-            {% if reservation.charges.all %}
-              <ul>
-                {% for charge in reservation.charges.all %}
-                  <li>
-                    <span>
-                      {{ charge.get_kind_display }}
-                      {% if charge.payment %}
-                        <span class="charge-paid">Paid</span>
-                      {% else %}
-                        <span class="charge-unpaid">Unpaid</span>
-                      {% endif %}
-                    </span>
-
-                    <strong>₹{{ charge.amount_inr|floatformat:2 }}</strong>
-                  </li>
-                {% endfor %}
-              </ul>
-            {% else %}
-              <p>No charges recorded for this booking.</p>
-            {% endif %}
-          </div>
-
-        </article>
-      {% endfor %}
-    </div>
-
-    {% if page_obj.paginator.num_pages > 1 %}
-      <nav class="history-pagination" aria-label="Booking history pages">
-
-        {% if page_obj.has_previous %}
-          <a href="?page={{ page_obj.previous_page_number }}">
-            Previous
-          </a>
-        {% endif %}
-
-        <span>
-          Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
-        </span>
-
-        {% if page_obj.has_next %}
-          <a href="?page={{ page_obj.next_page_number }}">
-            Next
-          </a>
-        {% endif %}
-
-      </nav>
-    {% endif %}
-
-  {% else %}
-    <div class="history-empty">
-      <h2>No bookings yet</h2>
-      <p>Your parking reservations will appear here.</p>
-      <a href="{% url 'reservations:search' %}" class="button">
-        Find Parking
-      </a>
-    </div>
+  {% if history_error %}
+    <div class="message message-error" role="alert">{{ history_error }}</div>
   {% endif %}
 
+  <section class="history-card" aria-labelledby="history-list-heading">
+    <div class="history-list-heading">
+      <div>
+        <h2 id="history-list-heading">Your reservations</h2>
+        <p>Most recent bookings appear first.</p>
+      </div>
+      <span class="history-count">
+        {{ page_obj.paginator.count|default:reservations|length }} bookings
+      </span>
+    </div>
+
+    {% if reservations %}
+      <div class="history-table-wrapper">
+        <table class="history-table">
+          <thead>
+            <tr>
+              <th scope="col">Booking reference</th>
+              <th scope="col">Parking lot</th>
+              <th scope="col">Slot</th>
+              <th scope="col">Booking window</th>
+              <th scope="col">State</th>
+              <th scope="col">Charges</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for reservation in reservations %}
+              <tr>
+                <td>
+                  <strong>{{ reservation.booking_ref }}</strong>
+                </td>
+                <td>{{ reservation.slot.lot.name }}</td>
+                <td>{{ reservation.slot.code }}</td>
+                <td>
+                  <div class="history-window">
+                    <span>
+                      {{ reservation.period.lower|date:"d M Y, h:i A"|default:"—" }}
+                    </span>
+                    <span class="history-window-separator">to</span>
+                    <span>
+                      {{ reservation.period.upper|date:"d M Y, h:i A"|default:"—" }}
+                    </span>
+                  </div>
+                </td>
+                <td>
+                  <span class="history-state">{{ reservation.get_status_display|default:reservation.status }}</span>
+                </td>
+                <td>
+                  {% with charges=reservation.charges.all %}
+                    {% if charges %}
+                      <ul class="history-charges">
+                        {% for charge in charges %}
+                          <li>
+                            {{ charge.get_kind_display|default:charge.kind }}:
+                            ₹{{ charge.amount_inr|floatformat:2 }}
+                          </li>
+                        {% endfor %}
+                      </ul>
+                    {% else %}
+                      <span class="history-no-charge">No charges recorded</span>
+                    {% endif %}
+                  {% endwith %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {% if page_obj.paginator.num_pages > 1 %}
+        <nav class="history-pagination" aria-label="Booking history pages">
+          {% if page_obj.has_previous %}
+            <a href="?page={{ page_obj.previous_page_number }}" rel="prev">
+              Previous
+            </a>
+          {% else %}
+            <span class="history-page-disabled">Previous</span>
+          {% endif %}
+
+          <span class="history-page-number">
+            Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+          </span>
+
+          {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}" rel="next">
+              Next
+            </a>
+          {% else %}
+            <span class="history-page-disabled">Next</span>
+          {% endif %}
+        </nav>
+      {% endif %}
+
+    {% else %}
+      <div class="history-empty">
+        <h3>No bookings yet</h3>
+        <p>Your upcoming and completed reservations will appear here.</p>
+        <a href="{% url 'reservations:search' %}" class="history-new-booking">
+          Find parking
+        </a>
+      </div>
+    {% endif %}
+  </section>
+
+  <p class="history-footnote">
+    Booking history displays reservation details and recorded charges.
+  </p>
 </section>
 {% endblock %}

@@ -1,8 +1,10 @@
 """Payment recording (FR-GATE-05) and unpaid-charge lookup."""
 
+from decimal import Decimal
+
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
-from django.db.models import Q
+from django.db.models import Q, Sum
 
 from vps.accounts.roles import Function, can
 from vps.audit.models import AuditLog
@@ -58,3 +60,11 @@ def unpaid_charges(query):
         .select_related("reservation")
         .order_by("id")
     )
+
+
+def unpaid_total(driver):
+    """FR-BILL-05: the sum of a Driver's charges that have no payment yet."""
+    total = Charge.objects.filter(reservation__driver=driver, payment__isnull=True).aggregate(
+        total=Sum("amount_inr")
+    )["total"]
+    return total or Decimal("0.00")

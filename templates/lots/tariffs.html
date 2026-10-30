@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block title %}Tariff Management | Vehicle Parking System{% endblock %}
+
+{% block content %}
+<section class="tariff-page" aria-labelledby="tariff-heading">
+  <div class="tariff-heading">
+    <div>
+      <p class="tariff-eyebrow">LOT ADMINISTRATION</p>
+      <h1 id="tariff-heading">Tariff Management</h1>
+      <p>Configure hourly parking rates for each lot and slot type.</p>
+    </div>
+    <span class="tariff-badge">Billing settings</span>
+  </div>
+
+  {% if tariff_error %}
+    <div class="message message-error" role="alert">{{ tariff_error }}</div>
+  {% endif %}
+
+  {% if tariff_message %}
+    <div class="message message-info" role="status">{{ tariff_message }}</div>
+  {% endif %}
+
+  <section class="tariff-card" aria-labelledby="tariff-form-heading">
+    <h2 id="tariff-form-heading">Set a new tariff</h2>
+    <p class="tariff-muted">
+      Choose a parking lot, slot type, hourly rate, and effective date.
+    </p>
+
+    <form method="post"
+          action="{{ save_tariff_url|default:'' }}"
+          class="tariff-form">
+      {% csrf_token %}
+
+      <div class="tariff-field">
+        <label for="tariff-lot">Parking lot</label>
+        <select id="tariff-lot" name="lot_id" required>
+          <option value="">Select a parking lot</option>
+          {% for lot in lots %}
+            <option value="{{ lot.pk }}">{{ lot.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="tariff-field">
+        <label for="tariff-slot-type">Slot type</label>
+        <select id="tariff-slot-type" name="slot_type" required>
+          <option value="">Select a slot type</option>
+          <option value="Standard">Standard</option>
+          <option value="TwoWheeler">Two-wheeler</option>
+          <option value="EV">Electric vehicle</option>
+          <option value="Accessible">Accessible</option>
+        </select>
+      </div>
+
+      <div class="tariff-field">
+        <label for="tariff-rate">Hourly rate (₹)</label>
+        <div class="tariff-rate-input">
+          <span aria-hidden="true">₹</span>
+          <input
+            id="tariff-rate"
+            name="hourly_rate_inr"
+            type="number"
+            min="0.01"
+            step="0.01"
+            placeholder="e.g. 50.00"
+            required
+          >
+        </div>
+        <small>Enter the amount charged per hour.</small>
+      </div>
+
+      <div class="tariff-field">
+        <label for="tariff-effective-from">Effective from</label>
+        <input
+          id="tariff-effective-from"
+          name="effective_from"
+          type="date"
+          required
+        >
+        <small>The date from which this rate should apply.</small>
+      </div>
+
+      <div class="tariff-form-actions">
+        <button type="submit" {% if not save_tariff_url %}disabled{% endif %}>
+          Save tariff
+        </button>
+      </div>
+    </form>
+
+    {% if not save_tariff_url %}
+      <p class="tariff-notice">
+        Tariff submission will be available after backend integration.
+      </p>
+    {% endif %}
+  </section>
+
+  <section class="tariff-card tariff-list" aria-labelledby="tariff-list-heading">
+    <div class="tariff-list-heading">
+      <div>
+        <h2 id="tariff-list-heading">Configured tariffs</h2>
+        <p class="tariff-muted">Review rates and their effective dates.</p>
+      </div>
+      <span class="tariff-count">{{ tariffs|length }} entries</span>
+    </div>
+
+    {% if tariffs %}
+      <div class="tariff-table-wrapper">
+        <table class="tariff-table">
+          <thead>
+            <tr>
+              <th scope="col">Parking lot</th>
+              <th scope="col">Slot type</th>
+              <th scope="col">Hourly rate</th>
+              <th scope="col">Effective from</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for tariff in tariffs %}
+              <tr>
+                <td>{{ tariff.lot.name }}</td>
+                <td>{{ tariff.get_slot_type_display|default:tariff.slot_type }}</td>
+                <td>₹{{ tariff.hourly_rate_inr|floatformat:2 }}</td>
+                <td>{{ tariff.effective_from|date:"d M Y" }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="tariff-empty">
+        <h3>No tariffs to display</h3>
+        <p>Configured parking rates will appear here when tariff data is connected.</p>
+      </div>
+    {% endif %}
+  </section>
+
+  <p class="tariff-footnote">
+    Billing must use the tariff effective at the vehicle's entry time.
+    This screen does not calculate parking charges.
+  </p>
+</section>
+{% endblock %}

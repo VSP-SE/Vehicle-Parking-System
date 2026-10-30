@@ -110,6 +110,7 @@
       another booking where the time window permits.
     </p>
 
+    <a href="{% url 'gate:printable_receipt' reservation.booking_ref %}">Printable receipt</a>
     <a href="{% url 'gate:payments' %}">Go to payment processing</a>
     <a href="{% url 'gate:checkout' %}">Check out another vehicle</a>
   </div>
