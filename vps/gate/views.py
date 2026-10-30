@@ -18,9 +18,11 @@ from vps.gate.services import (
     CHECKOUT_GRACE,
     _billable_hours,
     _hourly_rate,
+    check_in_vehicle,
     checkout_vehicle,
     register_walk_in,
 )
+from vps.lots.models import Lot
 from vps.reservations.models import Reservation
 
 
@@ -130,8 +132,7 @@ def receipt(request, booking_ref):
         and reservation.exit_time > reservation.period.upper + CHECKOUT_GRACE
     ):
         overstay_hours = _billable_hours(
-            reservation.exit_time
-            - (reservation.period.upper + CHECKOUT_GRACE)
+            reservation.exit_time - (reservation.period.upper + CHECKOUT_GRACE)
         )
 
     return render(
@@ -148,3 +149,71 @@ def receipt(request, booking_ref):
             "balance_due": total - paid_total,
         },
     )
+
+
+def _dashboard(request, **context):
+    """FR-GATE (#47): one console for check-in, check-out and walk-ins."""
+    return render(
+        request,
+        "gate/dashboard.html",
+        {
+            "checkin_url": reverse("gate:checkin"),
+            "checkout_url": reverse("gate:dashboard_checkout"),
+            "walkin_url": reverse("gate:dashboard_walk_in"),
+            "lots": Lot.objects.active(),
+            **context,
+        },
+    )
+
+
+@function_required(Function.GATE_OPERATIONS)
+@require_GET
+def dashboard(request):
+    """Display the Gate Attendant dashboard."""
+    return _dashboard(request)
+
+
+@function_required(Function.GATE_OPERATIONS)
+@require_POST
+def dashboard_checkin(request):
+    """FR-GATE-01/02: check in a reserved vehicle from the dashboard."""
+    try:
+        reservation = check_in_vehicle(request.POST.get("reference", ""), request.user)
+    except ValidationError as error:
+        return _dashboard(request, gate_error=" ".join(error.messages))
+    return _dashboard(
+        request,
+        gate_message=f"Checked in {reservation.vehicle_reg_no} at slot {reservation.slot.code}.",
+    )
+
+
+@function_required(Function.GATE_OPERATIONS)
+@require_POST
+def dashboard_checkout(request):
+    """FR-GATE-04: check out a vehicle from the dashboard and show its receipt."""
+    try:
+        reservation = checkout_vehicle(request.POST.get("reference", ""), request.user)
+    except ValidationError as error:
+        return _dashboard(request, gate_error=" ".join(error.messages))
+    return redirect("gate:receipt", booking_ref=reservation.booking_ref)
+
+
+@function_required(Function.GATE_OPERATIONS)
+@require_POST
+def dashboard_walk_in(request):
+    """FR-GATE-03: register a walk-in vehicle from the dashboard."""
+    form = WalkInForm(request.POST)
+    if form.is_valid():
+        try:
+            reservation = register_walk_in(request.user, **form.cleaned_data)
+        except ValidationError as error:
+            form.add_error(None, error)
+        else:
+            return _dashboard(
+                request,
+                gate_message=(
+                    f"Walk-in {reservation.vehicle_reg_no} parked in {reservation.slot.code}."
+                ),
+            )
+    errors = " ".join(error for field_errors in form.errors.values() for error in field_errors)
+    return _dashboard(request, gate_error=errors)
