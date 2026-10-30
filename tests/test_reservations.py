@@ -187,3 +187,26 @@ def test_exactly_one_booking_wins_the_last_slot(run):
     assert sum(result.startswith("VPS-") for result in results) == 1
     assert results.count(services.NO_SLOT) == 49
     assert Reservation.objects.filter(slot__lot=lot).count() == 1
+
+
+@pytest.mark.django_db
+def test_free_slots_judge_each_reservation_on_its_own():
+    """A cancelled overlap plus a live booking at another time must not hide the slot."""
+    lot = make_lot()
+    _, car = make_driver()
+    slot = lot.slots.get()
+    Reservation.objects.create(
+        booking_ref="VPS-261023-0001",
+        vehicle_reg_no="KA02CD0001",
+        slot=slot,
+        period=DateTimeTZRange(at(10), at(12)),
+        status=Reservation.Status.CANCELLED,
+    )
+    Reservation.objects.create(
+        booking_ref="VPS-261023-0002",
+        vehicle_reg_no="KA02CD0002",
+        slot=slot,
+        period=DateTimeTZRange(at(15), at(16)),
+    )
+
+    assert [s.code for s in services.free_slots(lot, car, at(10), at(12))] == ["S1"]

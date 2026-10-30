@@ -141,6 +141,8 @@ def test_too_early_message_names_the_day(attendant, driver, slot):
         check_in_vehicle(reservation.booking_ref, attendant)
     earliest = timezone.localtime(start - timedelta(minutes=15))
     assert f"{earliest:%d %b %H:%M}" in error.value.messages[0]
+
+
 def test_check_in_reallocates_when_slot_occupied(attendant, driver, slot):
     """FR-GATE-07: if the booked slot is occupied, give another free slot."""
     now = timezone.now()
