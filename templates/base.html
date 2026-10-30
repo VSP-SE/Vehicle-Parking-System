@@ -1313,8 +1313,10 @@
           <a href="{% url 'reservations:search' %}">Find parking</a>
         {% elif user.role == "Admin" %}
           <a href="{% url 'lots:list' %}">Parking lots</a>
+          <a href="{% url 'lots:tariffs' %}">Tariffs</a>
           <a href="{% url 'accounts:drivers' %}">Drivers</a>
         {% elif user.role == "Attendant" %}
+          <a href="{% url 'gate:dashboard' %}">Gate console</a>
           <a href="{% url 'reservations:search' %}">Slot search</a>
           <a href="{% url 'gate:walk_in' %}">Walk-in</a>
           <a href="{% url 'gate:checkout' %}">Check-out</a>
