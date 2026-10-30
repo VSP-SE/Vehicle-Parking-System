@@ -197,10 +197,13 @@ def dashboard_checkin(request):
         reservation = check_in_vehicle(request.POST.get("reference", ""), request.user)
     except ValidationError as error:
         return _dashboard(request, gate_error=" ".join(error.messages))
-    return _dashboard(
-        request,
-        gate_message=f"Checked in {reservation.vehicle_reg_no} at slot {reservation.slot.code}.",
-    )
+    message = f"Checked in {reservation.vehicle_reg_no} at slot {reservation.slot.code}."
+    if reservation.reallocated_from:
+        message += (
+            f" Slot {reservation.reallocated_from} is still occupied. "
+            f"Park in slot {reservation.slot.code}."
+        )
+    return _dashboard(request, gate_message=message)
 
 
 @function_required(Function.GATE_OPERATIONS)
