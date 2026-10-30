@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 import pytest
 from django.core import mail
+from django.core.exceptions import ValidationError
 from django.db.backends.postgresql.psycopg_any import DateTimeTZRange
 from django.utils import timezone
 
@@ -196,7 +197,7 @@ def test_failed_booking_queues_nothing(driver, lot):
     car = Vehicle.objects.create(
         owner=driver, registration_no="KA01AB1234", vehicle_type="TwoWheeler"
     )
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         reservations.reserve(driver, car, lot, START, START + timedelta(hours=1))
     assert not ReservationNotification.objects.exists()
 
