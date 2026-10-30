@@ -1,4 +1,4 @@
-"""Walk-in registration (FR-GATE-03)."""
+"""Walk-in (FR-GATE-03), check-out (FR-GATE-04) and outage time corrections (FR-GATE-06)."""
 
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -23,6 +23,10 @@ from vps.vehicles.services import normalise_registration, validate_registration
 
 CHECKOUT_GRACE = timedelta(minutes=10)
 OVERSTAY_MULTIPLIER = Decimal("1.5")
+MAX_CORRECTION_AGE = timedelta(hours=24)
+REASON_REQUIRED = "Give a reason for entering a past time."
+CORRECTION_TOO_OLD = "A past time can be at most 24 hours ago."
+CORRECTION_IN_FUTURE = "A past time cannot be in the future."
 
 
 def register_walk_in(attendant, lot, registration_no, vehicle_type, now=None):
@@ -92,6 +96,58 @@ def register_walk_in(attendant, lot, registration_no, vehicle_type, now=None):
     return reservation
 
 
+def _validate_correction(field, when, reason, now):
+    """FR-GATE-06: a time copied from paper must be within the last 24 hours and give a reason."""
+    reason = (reason or "").strip()
+    if not reason:
+        raise ValidationError({"reason": REASON_REQUIRED})
+    if when > now:
+        raise ValidationError({field: CORRECTION_IN_FUTURE})
+    if when < now - MAX_CORRECTION_AGE:
+        raise ValidationError({field: CORRECTION_TOO_OLD})
+    return reason
+
+
+def _active_reservation(query):
+    """Lock the Active reservation matching a booking reference or registration number."""
+    query = query.strip()
+    if not query:
+        raise ValidationError({"__all__": "Enter a booking reference or vehicle registration."})
+    reservation = (
+        Reservation.objects.select_for_update()
+        .select_related("slot__lot")
+        .filter(status=Reservation.Status.ACTIVE)
+        .filter(Q(booking_ref__iexact=query) | Q(vehicle_reg_no=normalise_registration(query)))
+        .first()
+    )
+    if reservation is None:
+        raise ValidationError(
+            {"__all__": "No Active reservation matches that booking reference or registration."}
+        )
+    return reservation
+
+
+def correct_entry_time(attendant, query, entry_time, reason, now=None):
+    """FR-GATE-06: record the entry time noted on paper for a vehicle that is still parked."""
+    if not can(attendant, Function.GATE_OPERATIONS):
+        raise ValidationError({"__all__": "Only Gate Attendants may correct entry times."})
+    now = now or timezone.now()
+    reason = _validate_correction("entry_time", entry_time, reason, now)
+    with transaction.atomic():
+        reservation = _active_reservation(query)
+        before = reservation.entry_time
+        reservation.entry_time = entry_time
+        reservation.save(update_fields=["entry_time"])
+        AuditLog.objects.create(
+            actor=attendant,
+            action="reservation.entry_corrected",
+            target=f"reservation:{reservation.booking_ref}",
+            before={"entry_time": before.isoformat() if before else None},
+            after={"entry_time": entry_time.isoformat(), "reason": reason},
+        )
+    return reservation
+
+
 def _billable_hours(duration, minimum_one_hour=False):
     """Round a duration up to 30-minute blocks."""
     if duration.total_seconds() <= 0:
@@ -134,35 +190,26 @@ def _hourly_rate(reservation):
     return tariff.hourly_rate_inr
 
 
-def checkout_vehicle(query, attendant, now=None):
+def checkout_vehicle(query, attendant, now=None, exit_time=None, reason=""):
     """
     FR-GATE-04: complete an Active reservation, calculate charges,
     record exit time, and create an audit entry atomically.
+
+    FR-GATE-06: after an outage, exit_time is the time noted on paper and needs a reason.
     """
     if not can(attendant, Function.GATE_OPERATIONS):
         raise ValidationError({"__all__": "Only Gate Attendants may check out vehicles."})
 
     now = now or timezone.now()
-    query = query.strip()
-
-    if not query:
-        raise ValidationError({"__all__": "Enter a booking reference or vehicle registration."})
-
-    registration = normalise_registration(query)
+    correction = {}
+    if exit_time is not None:
+        reason = _validate_correction("exit_time", exit_time, reason, now)
+        correction = {"corrected_from_paper": True, "reason": reason}
+        # From here on "now" is the exit being recorded, so billing uses the paper time.
+        now = exit_time
 
     with transaction.atomic():
-        reservation = (
-            Reservation.objects.select_for_update()
-            .select_related("slot__lot")
-            .filter(status=Reservation.Status.ACTIVE)
-            .filter(Q(booking_ref__iexact=query) | Q(vehicle_reg_no=registration))
-            .first()
-        )
-
-        if reservation is None:
-            raise ValidationError(
-                {"__all__": "No Active reservation matches that booking reference or registration."}
-            )
+        reservation = _active_reservation(query)
 
         if reservation.entry_time is None:
             raise ValidationError({"__all__": "This reservation has no recorded entry time."})
@@ -243,6 +290,7 @@ def checkout_vehicle(query, attendant, now=None):
                 "overstay_amount_inr": (
                     str(overstay_charge.amount_inr) if overstay_charge else "0.00"
                 ),
+                **correction,
             },
         )
 
