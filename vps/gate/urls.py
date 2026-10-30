@@ -11,4 +11,5 @@ urlpatterns = [
     path("receipt/<str:booking_ref>/", views.receipt, name="receipt"),
     path("payments/", views.payments, name="payments"),
     path("payments/<int:charge_id>/", views.pay_charge, name="pay_charge"),
+    path("receipt/<str:booking_ref>/print/",views.printable_receipt,name="printable_receipt"),
 ]

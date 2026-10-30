@@ -148,3 +148,79 @@ def receipt(request, booking_ref):
             "balance_due": total - paid_total,
         },
     )
+@function_required(Function.GATE_OPERATIONS)
+def printable_receipt(request, booking_ref):
+    """Render the printable receipt using the existing checkout calculations."""
+    reservation = get_object_or_404(
+        Reservation.objects.select_related("slot__lot"),
+        booking_ref=booking_ref,
+        status=Reservation.Status.COMPLETED,
+    )
+
+    charges = list(
+        reservation.charges.select_related("payment").order_by("id")
+    )
+
+    total = sum(
+        (charge.amount_inr for charge in charges),
+        Decimal("0.00"),
+    )
+
+    paid_total = sum(
+        (
+            charge.amount_inr
+            for charge in charges
+            if hasattr(charge, "payment")
+        ),
+        Decimal("0.00"),
+    )
+
+    payments = [
+        charge.payment
+        for charge in charges
+        if hasattr(charge, "payment")
+    ]
+    payment = max(payments, key=lambda item: item.paid_at, default=None)
+
+    parking_end = reservation.exit_time
+    if not reservation.is_walk_in:
+        parking_end = min(parking_end, reservation.period.upper)
+
+    parking_hours = _billable_hours(
+        parking_end - reservation.entry_time,
+        minimum_one_hour=True,
+    )
+
+    overstay_hours = Decimal("0.0")
+    if (
+        not reservation.is_walk_in
+        and reservation.exit_time > reservation.period.upper + CHECKOUT_GRACE
+    ):
+        overstay_hours = _billable_hours(
+            reservation.exit_time
+            - (reservation.period.upper + CHECKOUT_GRACE)
+        )
+
+    payment_status = (
+        "Paid" if paid_total == total
+        else "Partially paid" if paid_total > 0
+        else "Unpaid"
+    )
+
+    return render(
+        request,
+        "billing/receipt.html",
+        {
+            "reservation": reservation,
+            "charges": charges,
+            "payment": payment,
+            "payment_status": payment_status,
+            "billable_duration": (
+                f"{parking_hours + overstay_hours} hours"
+            ),
+            "hourly_rate": _hourly_rate(reservation),
+            "total_amount": total,
+            "paid_total": paid_total,
+            "balance_due": total - paid_total,
+        },
+    )
