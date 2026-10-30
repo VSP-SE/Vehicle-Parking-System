@@ -60,7 +60,12 @@ services:
     command:
       - sh
       - -c
-      - while true; do python manage.py expire_no_shows; sleep 60; done
+      - |
+        while true; do
+          python manage.py expire_no_shows
+          python manage.py send_reservation_notifications
+          sleep 60
+        done
     volumes:
       - .:/app
 

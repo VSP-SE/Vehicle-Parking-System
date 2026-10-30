@@ -14,6 +14,8 @@ from vps.allocation.services import allocate_slot_with_retry, eligible_slot_type
 from vps.audit.models import AuditLog
 from vps.billing.models import Charge
 from vps.lots.models import Slot
+from vps.notifications.models import ReservationNotification
+from vps.notifications.services import queue_reservation_notification
 from vps.reservations.models import Reservation
 
 NO_SLOT = "No slot available for this window"
@@ -147,7 +149,14 @@ def reserve(driver, vehicle, lot, start, end):
             return booked["reservation"] is not None
 
         if allocate_slot_with_retry(free_slots(lot, vehicle, start, end), vehicle, try_book):
-            return booked["reservation"]
+            reservation = booked["reservation"]
+
+            queue_reservation_notification(
+                reservation,
+                ReservationNotification.Event.CREATED,
+            )
+
+            return reservation
     raise ValidationError({"__all__": NO_SLOT})
 
 
@@ -178,6 +187,10 @@ def expire_no_shows(now=None):
                 target=f"reservation:{reservation.booking_ref}",
                 before={"status": Reservation.Status.RESERVED},
                 after={"status": Reservation.Status.EXPIRED},
+            )
+            queue_reservation_notification(
+                reservation,
+                ReservationNotification.Event.EXPIRED,
             )
             expired += 1
     return expired
@@ -220,5 +233,9 @@ def cancel_reservation(*, driver, reservation_id, now=None):
             "status": Reservation.Status.CANCELLED,
             "late_cancellation_inr": str(LATE_CANCELLATION_CHARGE_INR) if late else "0.00",
         },
+    )
+    queue_reservation_notification(
+    reservation,
+    ReservationNotification.Event.CANCELLED,
     )
     return reservation
