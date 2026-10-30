@@ -1311,13 +1311,17 @@
         {% if user.role == "Driver" %}
           <a href="{% url 'vehicles:register' %}">My vehicles</a>
           <a href="{% url 'reservations:search' %}">Find parking</a>
+          <a href="{% url 'reservations:history' %}">My bookings</a>
         {% elif user.role == "Admin" %}
           <a href="{% url 'lots:list' %}">Parking lots</a>
+          <a href="{% url 'lots:tariffs' %}">Tariffs</a>
           <a href="{% url 'accounts:drivers' %}">Drivers</a>
         {% elif user.role == "Attendant" %}
+          <a href="{% url 'gate:dashboard' %}">Gate console</a>
           <a href="{% url 'reservations:search' %}">Slot search</a>
           <a href="{% url 'gate:walk_in' %}">Walk-in</a>
           <a href="{% url 'gate:checkout' %}">Check-out</a>
+          <a href="{% url 'gate:correct_entry' %}">Correct entry</a>
           <a href="{% url 'gate:payments' %}">Payments</a>
         {% endif %}
       </nav>
