@@ -1311,6 +1311,7 @@
         {% if user.role == "Driver" %}
           <a href="{% url 'vehicles:register' %}">My vehicles</a>
           <a href="{% url 'reservations:search' %}">Find parking</a>
+          <a href="{% url 'reservations:history' %}">My bookings</a>
         {% elif user.role == "Admin" %}
           <a href="{% url 'lots:list' %}">Parking lots</a>
           <a href="{% url 'lots:tariffs' %}">Tariffs</a>

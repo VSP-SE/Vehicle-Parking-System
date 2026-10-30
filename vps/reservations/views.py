@@ -127,6 +127,7 @@ def cancel_booking(request, reservation_id):
         messages.success(request, f"Booking {reservation.booking_ref} cancelled free of charge.")
     return redirect("reservations:search")
 
+
 @require_GET
 @function_required(Function.OWN_RESERVATIONS)
 def booking_history(request):

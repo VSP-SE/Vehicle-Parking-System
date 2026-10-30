@@ -1,4 +1,3 @@
-
 """Driver booking history view tests (FR-RES-06, TC-29)."""
 
 from datetime import timedelta
@@ -62,9 +61,7 @@ def history_data(db):
 def test_driver_sees_only_own_bookings(client, history_data):
     driver = history_data["driver"]
     own_booking = history_data["create_booking"](1)
-    other_booking = history_data["create_booking"](
-        2, history_data["other_driver"]
-    )
+    other_booking = history_data["create_booking"](2, history_data["other_driver"])
 
     client.force_login(driver)
 
@@ -130,9 +127,7 @@ def test_booking_history_displays_booking_details(client, history_data):
 
 
 @pytest.mark.django_db
-def test_booking_history_displays_charges_and_payment_status(
-    client, history_data
-):
+def test_booking_history_displays_charges_and_payment_status(client, history_data):
     driver = history_data["driver"]
     booking = history_data["create_booking"](1)
 
@@ -182,3 +177,17 @@ def test_anonymous_user_is_redirected_to_login(client):
 
     assert response.status_code == 302
     assert "/accounts/login/" in response.url
+
+
+@pytest.mark.django_db
+def test_completed_booking_links_to_its_receipt_and_nav_links_here(client, history_data):
+    booking = history_data["create_booking"](1)
+    upcoming = history_data["create_booking"](2)
+    Reservation.objects.filter(pk=upcoming.pk).update(status=Reservation.Status.RESERVED)
+    client.force_login(history_data["driver"])
+
+    content = client.get(reverse("reservations:history")).content.decode()
+
+    assert f'href="/gate/receipt/{booking.booking_ref}/print/"' in content
+    assert f'href="/gate/receipt/{upcoming.booking_ref}/print/"' not in content
+    assert 'href="/reservations/history/"' in content

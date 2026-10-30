@@ -47,7 +47,11 @@
             {% for reservation in reservations %}
               <tr>
                 <td>
-                  <strong>{{ reservation.booking_ref }}</strong>
+                  <strong>{{ reservation.booking_ref }}</strong><br>
+                  {{ reservation.vehicle_reg_no }}
+                  {% if reservation.status == "Completed" %}
+                    <br><a href="{% url 'gate:printable_receipt' reservation.booking_ref %}">Receipt</a>
+                  {% endif %}
                 </td>
                 <td>{{ reservation.slot.lot.name }}</td>
                 <td>{{ reservation.slot.code }}</td>
@@ -73,6 +77,7 @@
                           <li>
                             {{ charge.get_kind_display|default:charge.kind }}:
                             ₹{{ charge.amount_inr|floatformat:2 }}
+                            ({% if charge.payment %}Paid{% else %}Unpaid{% endif %})
                           </li>
                         {% endfor %}
                       </ul>
