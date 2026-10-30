@@ -11,7 +11,6 @@ class Command(BaseCommand):
 
         self.stdout.write(
             self.style.SUCCESS(
-                f"Sent {result['sent']} notification(s); "
-                f"failed {result['failed']} attempt(s)."
+                f"Sent {result['sent']} notification(s); failed {result['failed']} attempt(s)."
             )
         )

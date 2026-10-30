@@ -1,10 +1,11 @@
+"""Reservation e-mails (FR-RES-07): queued with the change, sent by the scheduler."""
+
 from django.conf import settings
 from django.core.mail import send_mail
 from django.db import transaction
 from django.utils import timezone
 
 from vps.notifications.models import ReservationNotification
-
 
 MAX_ATTEMPTS = 5
 
@@ -37,10 +38,7 @@ def queue_reservation_notification(reservation, event):
     )
 
     period = reservation.period
-    event_key = (
-        f"{reservation.pk}:{event}:"
-        f"{period.lower.isoformat()}:{period.upper.isoformat()}"
-    )
+    event_key = f"{reservation.pk}:{event}:{period.lower.isoformat()}:{period.upper.isoformat()}"
 
     notification, _ = ReservationNotification.objects.get_or_create(
         event_key=event_key,
@@ -61,16 +59,19 @@ def process_pending_notifications(batch_size=50):
 
     sent = 0
     failed = 0
+    # One attempt per notification per run: the scheduler runs every minute, so retries
+    # are spread out instead of using up every attempt during one short mail outage.
+    tried = []
 
     for _ in range(batch_size):
         with transaction.atomic():
             notification = (
-                ReservationNotification.objects
-                .select_for_update(skip_locked=True)
+                ReservationNotification.objects.select_for_update(skip_locked=True)
                 .filter(
                     status=ReservationNotification.Status.PENDING,
                     attempts__lt=MAX_ATTEMPTS,
                 )
+                .exclude(pk__in=tried)
                 .order_by("created_at")
                 .first()
             )
@@ -78,6 +79,7 @@ def process_pending_notifications(batch_size=50):
             if notification is None:
                 break
 
+            tried.append(notification.pk)
             notification.attempts += 1
 
             try:

@@ -234,8 +234,5 @@ def cancel_reservation(*, driver, reservation_id, now=None):
             "late_cancellation_inr": str(LATE_CANCELLATION_CHARGE_INR) if late else "0.00",
         },
     )
-    queue_reservation_notification(
-    reservation,
-    ReservationNotification.Event.CANCELLED,
-    )
+    queue_reservation_notification(reservation, ReservationNotification.Event.CANCELLED)
     return reservation
