@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from math import ceil
 from types import SimpleNamespace
-
+from vps.lots.models import Slot
 from django.core.exceptions import ValidationError
 from django.db import connection, transaction
 from django.db.backends.postgresql.psycopg_any import DateTimeTZRange
@@ -30,7 +30,12 @@ CORRECTION_IN_FUTURE = "A past time cannot be in the future."
 
 CHECKIN_WINDOW = timedelta(minutes=15)
 
-
+def _slot_is_occupied(slot):
+    """Return True if the slot currently has an Active reservation."""
+    return Reservation.objects.filter(
+        slot=slot,
+        status=Reservation.Status.ACTIVE,
+    ).exists()
 def check_in_vehicle(query: str, attendant, now=None):
     """
     FR-GATE-01 / FR-GATE-02: Check in a Reserved reservation.
@@ -104,21 +109,57 @@ def check_in_vehicle(query: str, attendant, now=None):
             )
 
         # Success – activate
+        original_slot = reservation.slot
+        new_slot = None
+
+        # FR-GATE-07: if the original slot is still occupied, reallocate
+        if _slot_is_occupied(original_slot):
+            candidates = list(
+                Slot.objects.filter(
+                    lot=original_slot.lot,
+                    slot_type=original_slot.slot_type,
+                )
+                .exclude(pk=original_slot.pk)
+                .exclude(reservations__status=Reservation.Status.ACTIVE)
+                .exclude(
+                    reservations__status=Reservation.Status.RESERVED,
+                    reservations__period__overlap=reservation.period,
+                )
+                .order_by("distance_rank", "code")
+            )
+
+            if not candidates:
+                raise ValidationError(
+                    {"__all__": "The allocated slot is occupied and no alternative slot is free."}
+                )
+
+            new_slot = candidates[0]
+            reservation.slot = new_slot
+
+        # Success – activate
         reservation.status = Reservation.Status.ACTIVE
         reservation.entry_time = now
-        reservation.save(update_fields=["status", "entry_time"])
+        update_fields = ["status", "entry_time"]
+        if new_slot is not None:
+            update_fields.append("slot")
+        reservation.save(update_fields=update_fields)
+
+        after = {
+            "status": Reservation.Status.ACTIVE,
+            "entry_time": now.isoformat(),
+            "slot": reservation.slot.code,
+            "vehicle_reg_no": reservation.vehicle_reg_no,
+        }
+        if new_slot is not None:
+            after["reallocated_from"] = original_slot.code
+            after["reallocated_to"] = new_slot.code
 
         AuditLog.objects.create(
             actor=attendant,
             action="reservation.checked_in",
             target=f"reservation:{reservation.booking_ref}",
-            before={"status": Reservation.Status.RESERVED},
-            after={
-                "status": Reservation.Status.ACTIVE,
-                "entry_time": now.isoformat(),
-                "slot": reservation.slot.code,
-                "vehicle_reg_no": reservation.vehicle_reg_no,
-            },
+            before={"status": Reservation.Status.RESERVED, "slot": original_slot.code},
+            after=after,
         )
 
     return reservation
