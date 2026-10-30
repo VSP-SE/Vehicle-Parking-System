@@ -5,12 +5,13 @@ from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.core.exceptions import ValidationError
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
-from vps.accounts.permissions import function_required
-from vps.accounts.roles import Function
+from vps.accounts.permissions import function_required, role_required
+from vps.accounts.roles import PERMISSIONS, Function, can
 from vps.billing.models import Charge, Payment
 from vps.billing.services import record_payment, unpaid_charges
 from vps.gate.forms import CheckoutForm, WalkInForm
@@ -101,26 +102,12 @@ def checkout(request):
     return render(request, "gate/checkout.html", {"form": form})
 
 
-@function_required(Function.GATE_OPERATIONS)
-def receipt(request, booking_ref):
-    """Display the itemised checkout receipt."""
-    reservation = get_object_or_404(
-        Reservation.objects.select_related("slot__lot"),
-        booking_ref=booking_ref,
-        status=Reservation.Status.COMPLETED,
-    )
-
+def _receipt_context(reservation):
+    """FR-BILL-04: itemised charges, billable time and payment state of a completed stay."""
     charges = list(reservation.charges.select_related("payment").order_by("id"))
-
-    total = sum(
-        (charge.amount_inr for charge in charges),
-        Decimal("0.00"),
-    )
-
-    paid_total = sum(
-        (charge.amount_inr for charge in charges if hasattr(charge, "payment")),
-        Decimal("0.00"),
-    )
+    total = sum((charge.amount_inr for charge in charges), Decimal("0.00"))
+    payments = [charge.payment for charge in charges if hasattr(charge, "payment")]
+    paid_total = sum((payment.charge.amount_inr for payment in payments), Decimal("0.00"))
 
     parking_end = reservation.exit_time
     if not reservation.is_walk_in:
@@ -135,21 +122,50 @@ def receipt(request, booking_ref):
             reservation.exit_time - (reservation.period.upper + CHECKOUT_GRACE)
         )
 
-    return render(
-        request,
-        "gate/receipt.html",
-        {
-            "reservation": reservation,
-            "parking_hours": parking_hours,
-            "overstay_hours": overstay_hours,
-            "hourly_rate": _hourly_rate(reservation),
-            "charges": charges,
-            "total": total,
-            "paid_total": paid_total,
-            "balance_due": total - paid_total,
-        },
+    if paid_total == total:
+        payment_status = "Paid"
+    elif paid_total:
+        payment_status = "Partially paid"
+    else:
+        payment_status = "Unpaid"
+    return {
+        "reservation": reservation,
+        "parking_hours": parking_hours,
+        "overstay_hours": overstay_hours,
+        "billable_duration": f"{parking_hours + overstay_hours} hours",
+        "hourly_rate": _hourly_rate(reservation),
+        "charges": charges,
+        "total": total,
+        "total_amount": total,
+        "paid_total": paid_total,
+        "balance_due": total - paid_total,
+        "payment": max(payments, key=lambda payment: payment.paid_at, default=None),
+        "payment_status": payment_status,
+    }
+
+
+def _completed_reservation(booking_ref):
+    return get_object_or_404(
+        Reservation.objects.select_related("slot__lot"),
+        booking_ref=booking_ref,
+        status=Reservation.Status.COMPLETED,
     )
 
+
+@function_required(Function.GATE_OPERATIONS)
+def receipt(request, booking_ref):
+    """Display the itemised checkout receipt."""
+    reservation = _completed_reservation(booking_ref)
+    return render(request, "gate/receipt.html", _receipt_context(reservation))
+
+
+@role_required(*PERMISSIONS[Function.GATE_OPERATIONS], *PERMISSIONS[Function.OWN_RESERVATIONS])
+def printable_receipt(request, booking_ref):
+    """FR-BILL-04: the printable receipt, for attendants and for the Driver who booked."""
+    reservation = _completed_reservation(booking_ref)
+    if not can(request.user, Function.GATE_OPERATIONS) and reservation.driver_id != request.user.pk:
+        raise Http404("Receipt not found.")
+    return render(request, "billing/receipt.html", _receipt_context(reservation))
 
 def _dashboard(request, **context):
     """FR-GATE (#47): one console for check-in, check-out and walk-ins."""
