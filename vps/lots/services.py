@@ -6,7 +6,8 @@ from django.contrib.postgres.fields.ranges import DateTimeTZRange
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 
-from vps.lots.models import Lot, Slot, SlotBlock
+from vps.lots.models import Lot, Slot, SlotBlock, Tariff
+from vps.audit.services import log_action
 
 DUPLICATE_MESSAGE = "A parking lot with this name and address already exists. Change either field."
 REQUIRED_MESSAGES = {
@@ -200,3 +201,71 @@ def block_slot(
         raise
 
     return block
+# ---------------------------------------------------------------------------
+# Tariff management (Issue #53)
+# ---------------------------------------------------------------------------
+
+TARIFF_DUPLICATE_MESSAGE = (
+    "A tariff for this parking lot and slot type already exists "
+    "with the selected effective date."
+)
+
+
+def create_tariff(
+    *,
+    lot: Lot,
+    slot_type: str,
+    hourly_rate_inr,
+    effective_from,
+    actor,
+) -> Tariff:
+    """Create a tariff and record the change in the append-only audit log."""
+
+    if lot.is_archived:
+        raise ValidationError({"lot_id": "Cannot set a tariff for an archived parking lot."})
+
+    tariff = Tariff(
+        lot=lot,
+        slot_type=slot_type,
+        hourly_rate_inr=hourly_rate_inr,
+        effective_from=effective_from,
+    )
+
+    tariff.full_clean(validate_constraints=False)
+
+    if Tariff.objects.filter(
+        lot=lot,
+        slot_type=slot_type,
+        effective_from=effective_from,
+    ).exists():
+        raise ValidationError({"effective_from": TARIFF_DUPLICATE_MESSAGE})
+
+    target = f"lot:{lot.pk}/slot_type:{slot_type}"
+
+    try:
+        with transaction.atomic():
+            tariff.save()
+
+            log_action(
+                actor=actor,
+                action="tariff.change",
+                target=target,
+                before=None,
+                after={
+                    "hourly_rate_inr": str(tariff.hourly_rate_inr),
+                    "effective_from": tariff.effective_from.isoformat(),
+                },
+            )
+    except IntegrityError as error:
+        constraint = getattr(
+            getattr(error.__cause__, "diag", None),
+            "constraint_name",
+            None,
+        )
+        if constraint == "tariff_effective_uniq":
+            raise ValidationError(
+                {"effective_from": TARIFF_DUPLICATE_MESSAGE}
+            ) from error
+        raise
+
+    return tariff

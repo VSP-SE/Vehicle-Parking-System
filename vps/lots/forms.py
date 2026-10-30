@@ -4,7 +4,7 @@ from typing import ClassVar
 
 from django import forms
 
-from vps.lots.models import Lot
+from vps.lots.models import Lot, Slot
 from vps.lots.services import validate_hours, validate_unique_lot
 
 
@@ -39,3 +39,24 @@ class LotForm(forms.ModelForm):
         # form-level message for the same unique constraint.
         validate_unique_lot(cleaned.get("name"), cleaned.get("address"), self.instance.pk)
         return cleaned
+
+class TariffForm(forms.Form):
+    lot_id = forms.ModelChoiceField(
+        queryset=Lot.objects.active(),
+        label="Parking lot",
+        empty_label="Select a parking lot",
+    )
+    slot_type = forms.ChoiceField(
+        choices=Slot.SlotType.choices,
+        label="Slot type",
+    )
+    hourly_rate_inr = forms.DecimalField(
+        label="Hourly rate (₹)",
+        min_value=0.01,
+        max_digits=8,
+        decimal_places=2,
+    )
+    effective_from = forms.DateField(
+        label="Effective from",
+        widget=forms.DateInput(attrs={"type": "date"}),
+    )
