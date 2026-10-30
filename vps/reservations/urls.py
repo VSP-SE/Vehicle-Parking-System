@@ -8,6 +8,7 @@ app_name = "reservations"
 
 urlpatterns = [
     path("search/", views.slot_search, name="search"),
+    path("history/", views.booking_history, name="history"),
     path(
         "confirm/",
         views.confirm_reservation,
