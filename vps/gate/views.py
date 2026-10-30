@@ -1,4 +1,4 @@
-"""Gate Attendant walk-in and payment pages (FR-GATE-03, 05)."""
+"""Gate Attendant walk-in, check-out, correction and payment pages (FR-GATE-03 to 06)."""
 
 from decimal import Decimal
 from urllib.parse import urlencode
@@ -8,19 +8,21 @@ from django.core.exceptions import ValidationError
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from vps.accounts.permissions import function_required, role_required
 from vps.accounts.roles import PERMISSIONS, Function, can
 from vps.billing.models import Charge, Payment
 from vps.billing.services import record_payment, unpaid_charges
-from vps.gate.forms import CheckoutForm, WalkInForm
+from vps.gate.forms import CheckoutForm, EntryCorrectionForm, WalkInForm
 from vps.gate.services import (
     CHECKOUT_GRACE,
     _billable_hours,
     _hourly_rate,
     check_in_vehicle,
     checkout_vehicle,
+    correct_entry_time,
     register_walk_in,
 )
 from vps.lots.models import Lot
@@ -90,6 +92,8 @@ def checkout(request):
             reservation = checkout_vehicle(
                 query=form.cleaned_data["query"],
                 attendant=request.user,
+                exit_time=form.cleaned_data["exit_time"],
+                reason=form.cleaned_data["reason"],
             )
         except ValidationError as error:
             form.add_error(None, error)
@@ -100,6 +104,26 @@ def checkout(request):
             )
 
     return render(request, "gate/checkout.html", {"form": form})
+
+
+@function_required(Function.GATE_OPERATIONS)
+@require_http_methods(["GET", "POST"])
+def correct_entry(request):
+    """FR-GATE-06: enter the paper entry time for a vehicle parked during an outage."""
+    form = EntryCorrectionForm(request.POST if request.method == "POST" else None)
+    if request.method == "POST" and form.is_valid():
+        try:
+            reservation = correct_entry_time(request.user, **form.cleaned_data)
+        except ValidationError as error:
+            form.add_error(None, error)
+        else:
+            messages.success(
+                request,
+                f"Entry time for {reservation.booking_ref} corrected to "
+                f"{timezone.localtime(reservation.entry_time):%d %b %Y %H:%M}.",
+            )
+            return redirect("gate:correct_entry")
+    return render(request, "gate/correct_entry.html", {"form": form})
 
 
 def _receipt_context(reservation):
@@ -166,6 +190,7 @@ def printable_receipt(request, booking_ref):
     if not can(request.user, Function.GATE_OPERATIONS) and reservation.driver_id != request.user.pk:
         raise Http404("Receipt not found.")
     return render(request, "billing/receipt.html", _receipt_context(reservation))
+
 
 def _dashboard(request, **context):
     """FR-GATE (#47): one console for check-in, check-out and walk-ins."""

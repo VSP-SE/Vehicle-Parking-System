@@ -22,6 +22,19 @@
       {{ form.query.errors }}
     </div>
 
+    <fieldset>
+      <legend>System outage only</legend>
+      <p>If the exit was written on paper while the system was down, enter that time
+        (up to 24 hours ago) and the reason. Leave both empty to check out now.</p>
+      {% for field in form %}{% if field.name != "query" %}
+        <div class="field">
+          {{ field.label_tag }}
+          {{ field }}
+          {{ field.errors }}
+        </div>
+      {% endif %}{% endfor %}
+    </fieldset>
+
     <button type="submit">Check Out Vehicle</button>
   </form>
 </section>
