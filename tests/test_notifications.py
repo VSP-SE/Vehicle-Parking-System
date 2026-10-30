@@ -1,9 +1,7 @@
-import pytest
-from datetime import timedelta
 from unittest.mock import patch
 
+import pytest
 from django.core import mail
-from django.utils import timezone
 
 from vps.notifications.models import ReservationNotification
 from vps.notifications.services import (
@@ -11,8 +9,6 @@ from vps.notifications.services import (
     process_pending_notifications,
     queue_reservation_notification,
 )
-from vps.reservations.models import Reservation
-
 
 pytestmark = pytest.mark.django_db
 

@@ -1,10 +1,11 @@
+from smtplib import SMTPException
+
 from django.conf import settings
 from django.core.mail import send_mail
 from django.db import transaction
 from django.utils import timezone
 
 from vps.notifications.models import ReservationNotification
-
 
 MAX_ATTEMPTS = 5
 
@@ -97,7 +98,7 @@ def process_pending_notifications(batch_size=50):
                 notification.last_error = ""
                 sent += 1
 
-            except Exception as error:
+            except (SMTPException, OSError, RuntimeError) as error:
                 notification.last_error = str(error)
 
                 if notification.attempts >= MAX_ATTEMPTS:
