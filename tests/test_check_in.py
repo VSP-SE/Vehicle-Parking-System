@@ -114,3 +114,30 @@ def test_check_in_requires_attendant_role(driver, slot):
         check_in_vehicle(reservation.booking_ref, driver)  # driver is not attendant
 
     assert "Only Gate Attendants" in str(exc.value)
+
+
+def test_registration_picks_the_booking_in_its_window(attendant, driver, slot):
+    """Tomorrow's booking, made after today's, must not hide today's from a plate lookup."""
+    now = timezone.now()
+    for ref, start in (("VPS-TEST-TDAY", now), ("VPS-TEST-TMRW", now + timedelta(days=1))):
+        Reservation.objects.create(
+            booking_ref=ref,
+            driver=driver,
+            vehicle_reg_no="KA01AB1234",
+            slot=slot,
+            period=(start, start + timedelta(hours=2)),
+        )
+
+    result = check_in_vehicle("ka01ab1234", attendant, now=now)
+
+    assert result.booking_ref == "VPS-TEST-TDAY"
+    assert Reservation.objects.get(booking_ref="VPS-TEST-TMRW").status == "Reserved"
+
+
+def test_too_early_message_names_the_day(attendant, driver, slot):
+    start = timezone.now() + timedelta(days=1)
+    reservation = make_reservation(driver, slot, start)
+    with pytest.raises(ValidationError) as error:
+        check_in_vehicle(reservation.booking_ref, attendant)
+    earliest = timezone.localtime(start - timedelta(minutes=15))
+    assert f"{earliest:%d %b %H:%M}" in error.value.messages[0]

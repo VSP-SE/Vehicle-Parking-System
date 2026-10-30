@@ -47,14 +47,20 @@ def check_in_vehicle(query: str, attendant, now=None):
     registration = normalise_registration(query)
 
     with transaction.atomic():
-        reservation = (
+        candidates = list(
             Reservation.objects.select_for_update()
             .select_related("slot__lot")
             .filter(status=Reservation.Status.RESERVED)
             .filter(
                 Q(booking_ref__iexact=query) | Q(vehicle_reg_no=registration)
             )
-            .first()
+            .order_by("period")
+        )
+        # A plate can hold bookings on several days: take the earliest whose window is
+        # still open, so tomorrow's booking never hides today's.
+        reservation = next(
+            (r for r in candidates if now <= r.period.lower + CHECKIN_WINDOW),
+            candidates[-1] if candidates else None,
         )
 
         if reservation is None:
@@ -78,7 +84,7 @@ def check_in_vehicle(query: str, attendant, now=None):
                 {
                     "__all__": (
                         f"Too early to check in. "
-                        f"Earliest allowed time is {local_earliest:%H:%M}."
+                        f"Earliest allowed time is {local_earliest:%d %b %H:%M}."
                     )
                 }
             )
