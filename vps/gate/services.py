@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from math import ceil
 from types import SimpleNamespace
-from vps.lots.models import Slot
+
 from django.core.exceptions import ValidationError
 from django.db import connection, transaction
 from django.db.backends.postgresql.psycopg_any import DateTimeTZRange
@@ -15,7 +15,7 @@ from vps.accounts.roles import Function, can
 from vps.allocation.services import allocate_slot_with_retry
 from vps.audit.models import AuditLog
 from vps.billing.models import Charge
-from vps.lots.models import Tariff
+from vps.lots.models import Slot, Tariff
 from vps.reservations.models import Reservation
 from vps.reservations.services import NO_SLOT, _try_book, free_slots
 from vps.vehicles.models import Vehicle
