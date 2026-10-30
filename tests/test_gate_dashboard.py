@@ -1,4 +1,3 @@
-
 """Tests for the Gate Attendant dashboard (#47)."""
 
 from datetime import time, timedelta
@@ -29,8 +28,9 @@ def lot():
     return Lot.objects.create(
         name="Dashboard Lot",
         address="Ring Road",
-        opens_at=time(6),
-        closes_at=time(23),
+        opens_at=time(0),
+        # Open all day so walk-ins made at the real current time always fit.
+        closes_at=time(23, 59),
     )
 
 
@@ -49,7 +49,7 @@ def tariff(lot):
         lot=lot,
         slot_type="Standard",
         hourly_rate_inr="40.00",
-        effective_from=timezone.localdate(),
+        effective_from=timezone.localdate() - timedelta(days=1),
     )
 
 
@@ -185,7 +185,7 @@ def test_dashboard_checkin_rejects_expired_booking(
     assert response.status_code == 200
     assert booking.status == Reservation.Status.RESERVED
     assert booking.entry_time is None
-    assert b"grace period has expired" in response.content
+    assert b"check-in window has closed" in response.content
 
 
 def test_dashboard_checkout_redirects_to_receipt(
@@ -208,7 +208,6 @@ def test_dashboard_checkout_redirects_to_receipt(
         kwargs={"booking_ref": active_booking.booking_ref},
     )
     assert active_booking.status == Reservation.Status.COMPLETED
-
 
 
 def test_dashboard_walk_in_registers_vehicle(
@@ -238,7 +237,6 @@ def test_dashboard_walk_in_registers_vehicle(
     assert b"Walk-in KA05MN4747 parked" in response.content
 
 
-
 def test_dashboard_walk_in_rejects_invalid_lot(
     client,
     attendant,
@@ -259,3 +257,27 @@ def test_dashboard_walk_in_rejects_invalid_lot(
     assert not Reservation.objects.filter(
         vehicle_reg_no="KA05MN4748",
     ).exists()
+
+
+def test_dashboard_checkin_refuses_early_arrival(client, attendant, slot):
+    """FR-GATE-02: an early arrival is refused and told the earliest check-in time."""
+    start = timezone.now() + timedelta(hours=2)
+    booking = Reservation.objects.create(
+        booking_ref="VPS-261030-0050",
+        vehicle_reg_no="KA03EF5050",
+        slot=slot,
+        period=DateTimeTZRange(start, start + timedelta(hours=2)),
+    )
+    client.force_login(attendant)
+
+    response = client.post(reverse("gate:checkin"), {"reference": booking.booking_ref})
+
+    booking.refresh_from_db()
+    assert booking.status == Reservation.Status.RESERVED
+    earliest = timezone.localtime(start - timedelta(minutes=15))
+    assert f"Earliest allowed time is {earliest:%d %b %H:%M}" in response.content.decode()
+
+
+def test_attendant_nav_links_to_the_console(client, attendant):
+    client.force_login(attendant)
+    assert 'href="/gate/"' in client.get(reverse("gate:dashboard")).content.decode()
