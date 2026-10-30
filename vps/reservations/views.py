@@ -1,9 +1,11 @@
-"""Driver parking search, booking and confirmation pages."""
+﻿"""Driver parking search, booking and confirmation pages."""
 
 from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.core.exceptions import ValidationError
+from django.core.paginator import Paginator
+from django.db.models import Prefetch
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -124,3 +126,32 @@ def cancel_booking(request, reservation_id):
     else:
         messages.success(request, f"Booking {reservation.booking_ref} cancelled free of charge.")
     return redirect("reservations:search")
+
+
+@require_GET
+@function_required(Function.OWN_RESERVATIONS)
+def booking_history(request):
+    """FR-RES-06: Show a driver's reservations and charges, newest first."""
+    reservations = (
+        Reservation.objects.filter(driver=request.user)
+        .select_related("slot__lot")
+        .prefetch_related(
+            Prefetch(
+                "charges",
+                queryset=Charge.objects.select_related("payment").order_by("id"),
+            )
+        )
+        .order_by("-id")
+    )
+
+    paginator = Paginator(reservations, 20)
+    page_obj = paginator.get_page(request.GET.get("page"))
+
+    return render(
+        request,
+        "reservations/history.html",
+        {
+            "page_obj": page_obj,
+            "reservations": page_obj.object_list,
+        },
+    )

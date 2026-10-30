@@ -38,19 +38,26 @@
               <th scope="col">Booking reference</th>
               <th scope="col">Parking lot</th>
               <th scope="col">Slot</th>
+              <th scope="col">Vehicle</th>
               <th scope="col">Booking window</th>
               <th scope="col">State</th>
               <th scope="col">Charges</th>
             </tr>
           </thead>
+
           <tbody>
             {% for reservation in reservations %}
               <tr>
                 <td>
                   <strong>{{ reservation.booking_ref }}</strong>
                 </td>
+
                 <td>{{ reservation.slot.lot.name }}</td>
+
                 <td>{{ reservation.slot.code }}</td>
+
+                <td>{{ reservation.vehicle_reg_no }}</td>
+
                 <td>
                   <div class="history-window">
                     <span>
@@ -62,9 +69,13 @@
                     </span>
                   </div>
                 </td>
+
                 <td>
-                  <span class="history-state">{{ reservation.get_status_display|default:reservation.status }}</span>
+                  <span class="history-state">
+                    {{ reservation.get_status_display|default:reservation.status }}
+                  </span>
                 </td>
+
                 <td>
                   {% with charges=reservation.charges.all %}
                     {% if charges %}
@@ -73,11 +84,19 @@
                           <li>
                             {{ charge.get_kind_display|default:charge.kind }}:
                             ₹{{ charge.amount_inr|floatformat:2 }}
+
+                            {% if charge.payment %}
+                              <span class="history-payment-status">Paid</span>
+                            {% else %}
+                              <span class="history-payment-status">Unpaid</span>
+                            {% endif %}
                           </li>
                         {% endfor %}
                       </ul>
                     {% else %}
-                      <span class="history-no-charge">No charges recorded</span>
+                      <span class="history-no-charge">
+                        No charges recorded
+                      </span>
                     {% endif %}
                   {% endwith %}
                 </td>
