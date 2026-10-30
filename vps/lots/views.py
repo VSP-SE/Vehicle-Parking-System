@@ -1,10 +1,10 @@
 """Administrator lot pages; business rules belong to services."""
 
-from django.urls import reverse
 from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.db.models import Count
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_POST, require_safe
 
 from vps.accounts.permissions import function_required

@@ -6,8 +6,8 @@ from django.contrib.postgres.fields.ranges import DateTimeTZRange
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 
-from vps.lots.models import Lot, Slot, SlotBlock, Tariff
 from vps.audit.services import log_action
+from vps.lots.models import Lot, Slot, SlotBlock, Tariff
 
 DUPLICATE_MESSAGE = "A parking lot with this name and address already exists. Change either field."
 REQUIRED_MESSAGES = {
