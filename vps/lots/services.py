@@ -5,6 +5,7 @@ from datetime import datetime
 from django.contrib.postgres.fields.ranges import DateTimeTZRange
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
+from django.utils import timezone
 
 from vps.audit.services import log_action
 from vps.lots.models import Lot, Slot, SlotBlock, Tariff
@@ -201,10 +202,15 @@ def block_slot(
         raise
 
     return block
+
+
 # ---------------------------------------------------------------------------
 # Tariff management (Issue #53)
 # ---------------------------------------------------------------------------
 
+TARIFF_IN_PAST_MESSAGE = (
+    "A new tariff cannot start in the past: charges use the tariff in force at entry."
+)
 TARIFF_DUPLICATE_MESSAGE = (
     "A tariff for this parking lot and slot type already exists "
     "with the selected effective date."
@@ -218,11 +224,16 @@ def create_tariff(
     hourly_rate_inr,
     effective_from,
     actor,
+    today=None,
 ) -> Tariff:
-    """Create a tariff and record the change in the append-only audit log."""
+    """FR-BILL-01: create a tariff and record the change in the append-only audit log."""
 
     if lot.is_archived:
         raise ValidationError({"lot_id": "Cannot set a tariff for an archived parking lot."})
+
+    # A backdated rate would change the charge for vehicles that are already parked.
+    if effective_from < (today or timezone.localdate()):
+        raise ValidationError({"effective_from": TARIFF_IN_PAST_MESSAGE})
 
     tariff = Tariff(
         lot=lot,
