@@ -1,3 +1,4 @@
+
 {% extends "base.html" %}
 
 {% block title %}Gate Operations | Vehicle Parking System{% endblock %}
@@ -27,13 +28,19 @@
   </nav>
 
   <div class="gate-panels">
+
+    <!-- Vehicle Check-in -->
     <section id="check-in" class="gate-panel" aria-labelledby="check-in-heading">
       <h2 id="check-in-heading">Vehicle check-in</h2>
       <p>Find a reservation to begin arrival processing.</p>
+
       <form method="post" action="{{ checkin_url|default:'' }}" class="gate-form">
         {% csrf_token %}
         <input type="hidden" name="operation" value="checkin">
-        <label for="checkin-reference">Booking reference or registration</label>
+
+        <label for="checkin-reference">
+          Booking reference or registration
+        </label>
         <input
           id="checkin-reference"
           name="reference"
@@ -41,19 +48,25 @@
           autocomplete="off"
           placeholder="Enter or scan reference"
           required>
+
         <button type="submit" {% if not checkin_url %}disabled{% endif %}>
           Check in
         </button>
       </form>
     </section>
 
+    <!-- Vehicle Check-out -->
     <section id="check-out" class="gate-panel" aria-labelledby="check-out-heading">
       <h2 id="check-out-heading">Vehicle check-out</h2>
       <p>Find an active parking session to begin departure processing.</p>
+
       <form method="post" action="{{ checkout_url|default:'' }}" class="gate-form">
         {% csrf_token %}
         <input type="hidden" name="operation" value="checkout">
-        <label for="checkout-reference">Booking reference or registration</label>
+
+        <label for="checkout-reference">
+          Booking reference or registration
+        </label>
         <input
           id="checkout-reference"
           name="reference"
@@ -61,18 +74,30 @@
           autocomplete="off"
           placeholder="Enter or scan reference"
           required>
+
         <button type="submit" {% if not checkout_url %}disabled{% endif %}>
           Check out
         </button>
       </form>
     </section>
 
+    <!-- Walk-in Registration -->
     <section id="walk-in" class="gate-panel" aria-labelledby="walk-in-heading">
       <h2 id="walk-in-heading">Walk-in vehicle</h2>
       <p>Enter vehicle details for a driver arriving without a reservation.</p>
+
       <form method="post" action="{{ walkin_url|default:'' }}" class="gate-form">
         {% csrf_token %}
         <input type="hidden" name="operation" value="walkin">
+
+        <label for="walkin-lot">Parking lot</label>
+        <select id="walkin-lot" name="lot" required>
+          <option value="">Select a parking lot</option>
+          {% for lot in lots %}
+            <option value="{{ lot.pk }}">{{ lot.name }}</option>
+          {% endfor %}
+        </select>
+
         <label for="walkin-registration">Vehicle registration</label>
         <input
           id="walkin-registration"
@@ -96,6 +121,7 @@
         </button>
       </form>
     </section>
+
   </div>
 
   <p class="gate-footnote">

@@ -17,7 +17,7 @@ from vps.audit.models import AuditLog
 from vps.billing.models import Charge
 from vps.lots.models import Tariff
 from vps.reservations.models import Reservation
-from vps.reservations.services import NO_SLOT, _try_book, free_slots
+from vps.reservations.services import NO_SHOW_GRACE, NO_SLOT, _try_book, free_slots
 from vps.vehicles.models import Vehicle
 from vps.vehicles.services import normalise_registration, validate_registration
 
@@ -243,6 +243,64 @@ def checkout_vehicle(query, attendant, now=None):
                 "overstay_amount_inr": (
                     str(overstay_charge.amount_inr) if overstay_charge else "0.00"
                 ),
+            },
+        )
+
+    return reservation
+
+
+def checkin_vehicle(query, attendant, now=None):
+    """FR-GATE-01: check in a reserved vehicle and record its arrival atomically."""
+    if not can(attendant, Function.GATE_OPERATIONS):
+        raise ValidationError(
+            {"__all__": "Only Gate Attendants may check in vehicles."}
+        )
+
+    query = query.strip()
+    if not query:
+        raise ValidationError(
+            {"__all__": "Enter a booking reference or vehicle registration."}
+        )
+
+    now = now or timezone.now()
+    registration = normalise_registration(query)
+
+    with transaction.atomic():
+        reservation = (
+            Reservation.objects.select_for_update()
+            .select_related("slot__lot")
+            .filter(status=Reservation.Status.RESERVED)
+            .filter(
+                Q(booking_ref__iexact=query)
+                | Q(vehicle_reg_no=registration)
+            )
+            .first()
+        )
+
+        if reservation is None:
+            raise ValidationError(
+                {"__all__": "No Reserved booking matches that reference or registration."}
+            )
+
+        if now > reservation.period.lower + NO_SHOW_GRACE:
+            raise ValidationError(
+                {"__all__": "The check-in grace period has expired."}
+            )
+
+        reservation.status = Reservation.Status.ACTIVE
+        reservation.entry_time = now
+        reservation.save(update_fields=["status", "entry_time"])
+
+        AuditLog.objects.create(
+            actor=attendant,
+            action="reservation.checked_in",
+            target=f"reservation:{reservation.booking_ref}",
+            before={"status": Reservation.Status.RESERVED},
+            after={
+                "status": Reservation.Status.ACTIVE,
+                "vehicle_reg_no": reservation.vehicle_reg_no,
+                "slot": reservation.slot.code,
+                "entry_time": now.isoformat(),
             },
         )
 

@@ -18,9 +18,11 @@ from vps.gate.services import (
     CHECKOUT_GRACE,
     _billable_hours,
     _hourly_rate,
+    checkin_vehicle,
     checkout_vehicle,
     register_walk_in,
 )
+from vps.lots.models import Lot
 from vps.reservations.models import Reservation
 
 
@@ -146,5 +148,131 @@ def receipt(request, booking_ref):
             "total": total,
             "paid_total": paid_total,
             "balance_due": total - paid_total,
+        },
+    )
+@function_required(Function.GATE_OPERATIONS)
+@require_GET
+def dashboard(request):
+    """Display the Gate Attendant dashboard."""
+    return render(
+        request,
+        "gate/dashboard.html",
+        {
+            "checkin_url": reverse("gate:checkin"),
+            "checkout_url": reverse("gate:dashboard_checkout"),
+            "walkin_url": reverse("gate:dashboard_walk_in"),
+            "lots": Lot.objects.active(),
+        },
+    )
+
+
+@function_required(Function.GATE_OPERATIONS)
+@require_POST
+def dashboard_checkin(request):
+    """Check in a reserved vehicle from the dashboard."""
+    try:
+        reservation = checkin_vehicle(
+            query=request.POST.get("reference", ""),
+            attendant=request.user,
+        )
+    except ValidationError as error:
+        return render(
+            request,
+            "gate/dashboard.html",
+            {
+                "checkin_url": reverse("gate:checkin"),
+                "checkout_url": reverse("gate:dashboard_checkout"),
+                "walkin_url": reverse("gate:dashboard_walk_in"),
+                "lots": Lot.objects.active(),
+                "gate_error": " ".join(error.messages),
+            },
+        )
+
+    return render(
+        request,
+        "gate/dashboard.html",
+        {
+            "checkin_url": reverse("gate:checkin"),
+            "checkout_url": reverse("gate:dashboard_checkout"),
+            "walkin_url": reverse("gate:dashboard_walk_in"),
+            "lots": Lot.objects.active(),
+            "gate_message": (
+                f"Checked in {reservation.vehicle_reg_no} "
+                f"at slot {reservation.slot.code}."
+            ),
+        },
+    )
+
+
+@function_required(Function.GATE_OPERATIONS)
+@require_POST
+def dashboard_checkout(request):
+    """Check out a vehicle from the dashboard."""
+    try:
+        reservation = checkout_vehicle(
+            query=request.POST.get("reference", ""),
+            attendant=request.user,
+        )
+    except ValidationError as error:
+        return render(
+            request,
+            "gate/dashboard.html",
+            {
+                "checkin_url": reverse("gate:checkin"),
+                "checkout_url": reverse("gate:dashboard_checkout"),
+                "walkin_url": reverse("gate:dashboard_walk_in"),
+                "lots": Lot.objects.active(),
+                "gate_error": " ".join(error.messages),
+            },
+        )
+
+    return redirect("gate:receipt", booking_ref=reservation.booking_ref)
+
+
+@function_required(Function.GATE_OPERATIONS)
+@require_POST
+def dashboard_walk_in(request):
+    """Register a walk-in vehicle from the dashboard."""
+    form = WalkInForm(request.POST)
+
+    if form.is_valid():
+        try:
+            reservation = register_walk_in(
+                request.user,
+                **form.cleaned_data,
+            )
+        except ValidationError as error:
+            form.add_error(None, error)
+        else:
+            return render(
+                request,
+                "gate/dashboard.html",
+                {
+                    "checkin_url": reverse("gate:checkin"),
+                    "checkout_url": reverse("gate:dashboard_checkout"),
+                    "walkin_url": reverse("gate:dashboard_walk_in"),
+                    "lots": Lot.objects.active(),
+                    "gate_message": (
+                        f"Walk-in {reservation.vehicle_reg_no} parked "
+                        f"in {reservation.slot.code}."
+                    ),
+                },
+            )
+
+    errors = " ".join(
+        error
+        for field_errors in form.errors.values()
+        for error in field_errors
+    )
+
+    return render(
+        request,
+        "gate/dashboard.html",
+        {
+            "checkin_url": reverse("gate:checkin"),
+            "checkout_url": reverse("gate:dashboard_checkout"),
+            "walkin_url": reverse("gate:dashboard_walk_in"),
+            "lots": Lot.objects.active(),
+            "gate_error": errors,
         },
     )
