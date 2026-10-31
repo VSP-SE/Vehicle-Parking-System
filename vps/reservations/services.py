@@ -6,6 +6,7 @@ from decimal import Decimal
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, connection, transaction
 from django.db.backends.postgresql.psycopg_any import DateTimeTZRange
+from django.db.models import Exists, OuterRef
 from django.utils import timezone
 
 from vps.accounts.models import User
@@ -14,6 +15,8 @@ from vps.allocation.services import allocate_slot_with_retry, eligible_slot_type
 from vps.audit.models import AuditLog
 from vps.billing.models import Charge
 from vps.lots.models import Slot
+from vps.notifications.models import ReservationNotification
+from vps.notifications.services import queue_reservation_notification
 from vps.reservations.models import Reservation
 
 NO_SLOT = "No slot available for this window"
@@ -56,13 +59,17 @@ def validate_window(lot, start, end, now=None):
 def free_slots(lot, vehicle, start, end):
     """Slots in the lot that suit the vehicle and are neither blocked nor held for the window."""
     period = DateTimeTZRange(start, end)
+    # One subquery, so status and overlap must hold for the same reservation. Two
+    # conditions in a single exclude() across a relation may match different rows.
+    held = Reservation.objects.filter(
+        slot=OuterRef("pk"),
+        status__in=[Reservation.Status.RESERVED, Reservation.Status.ACTIVE],
+        period__overlap=period,
+    )
     return list(
         Slot.objects.filter(lot=lot, slot_type__in=eligible_slot_types(vehicle))
         .exclude(blocks__period__overlap=period)
-        .exclude(
-            reservations__status__in=[Reservation.Status.RESERVED, Reservation.Status.ACTIVE],
-            reservations__period__overlap=period,
-        )
+        .exclude(Exists(held))
         .select_related("lot")
     )
 
@@ -147,7 +154,14 @@ def reserve(driver, vehicle, lot, start, end):
             return booked["reservation"] is not None
 
         if allocate_slot_with_retry(free_slots(lot, vehicle, start, end), vehicle, try_book):
-            return booked["reservation"]
+            reservation = booked["reservation"]
+
+            queue_reservation_notification(
+                reservation,
+                ReservationNotification.Event.CREATED,
+            )
+
+            return reservation
     raise ValidationError({"__all__": NO_SLOT})
 
 
@@ -178,6 +192,10 @@ def expire_no_shows(now=None):
                 target=f"reservation:{reservation.booking_ref}",
                 before={"status": Reservation.Status.RESERVED},
                 after={"status": Reservation.Status.EXPIRED},
+            )
+            queue_reservation_notification(
+                reservation,
+                ReservationNotification.Event.EXPIRED,
             )
             expired += 1
     return expired
@@ -221,4 +239,5 @@ def cancel_reservation(*, driver, reservation_id, now=None):
             "late_cancellation_inr": str(LATE_CANCELLATION_CHARGE_INR) if late else "0.00",
         },
     )
+    queue_reservation_notification(reservation, ReservationNotification.Event.CANCELLED)
     return reservation

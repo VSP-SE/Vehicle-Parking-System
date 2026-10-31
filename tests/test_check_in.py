@@ -141,3 +141,42 @@ def test_too_early_message_names_the_day(attendant, driver, slot):
         check_in_vehicle(reservation.booking_ref, attendant)
     earliest = timezone.localtime(start - timedelta(minutes=15))
     assert f"{earliest:%d %b %H:%M}" in error.value.messages[0]
+
+
+def test_check_in_reallocates_when_slot_occupied(attendant, driver, slot):
+    """FR-GATE-07: if the booked slot is occupied, give another free slot."""
+    now = timezone.now()
+    start = now + timedelta(minutes=5)
+    end = start + timedelta(hours=2)
+
+    reservation = Reservation.objects.create(
+        booking_ref="VPS-RA-001",
+        driver=driver,
+        vehicle_reg_no="KA01AB1234",
+        slot=slot,
+        period=(start, end),
+        status=Reservation.Status.RESERVED,
+    )
+
+    free_slot = Slot.objects.create(
+        lot=slot.lot,
+        code="A-02",
+        slot_type=slot.slot_type,
+        distance_rank=2,
+    )
+
+    # Overstaying Active reservation (period ends before the new one starts)
+    Reservation.objects.create(
+        booking_ref="VPS-OS-001",
+        vehicle_reg_no="KA99ZZ9999",
+        slot=slot,
+        period=(now - timedelta(hours=5), now - timedelta(minutes=10)),
+        status=Reservation.Status.ACTIVE,
+        entry_time=now - timedelta(hours=5),
+    )
+
+    result = check_in_vehicle(reservation.booking_ref, attendant)
+
+    assert result.status == Reservation.Status.ACTIVE
+    assert result.slot.pk == free_slot.pk
+    assert result.slot.code == "A-02"

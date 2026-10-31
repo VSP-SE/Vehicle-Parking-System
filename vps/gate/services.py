@@ -6,7 +6,7 @@ from math import ceil
 from types import SimpleNamespace
 
 from django.core.exceptions import ValidationError
-from django.db import connection, transaction
+from django.db import IntegrityError, connection, transaction
 from django.db.backends.postgresql.psycopg_any import DateTimeTZRange
 from django.db.models import Q
 from django.utils import timezone
@@ -29,6 +29,62 @@ CORRECTION_TOO_OLD = "A past time can be at most 24 hours ago."
 CORRECTION_IN_FUTURE = "A past time cannot be in the future."
 
 CHECKIN_WINDOW = timedelta(minutes=15)
+
+SLOT_STILL_OCCUPIED = (
+    "The booked slot is still occupied and no other suitable slot is free. "
+    "Ask the driver to wait or direct them to another lot."
+)
+# For a booking whose vehicle is no longer registered, keep to the booked slot's kind.
+_VEHICLE_TYPE_FOR_SLOT = {"TwoWheeler": "TwoWheeler", "EV": "EV"}
+
+
+def _reallocate_if_occupied(reservation):
+    """FR-GATE-07: move the booking off a slot an overstaying vehicle still holds.
+
+    Candidates are eligible for the vehicle (FR-ALLOC-01), not blocked and not booked
+    for the window (free_slots), and not physically occupied now. Each move runs in a
+    savepoint, so a concurrent booking of the same slot makes it try the next best.
+    Returns the new slot, or None when the booked slot is free.
+    """
+    occupied = set(
+        Reservation.objects.filter(
+            slot__lot=reservation.slot.lot, status=Reservation.Status.ACTIVE
+        ).values_list("slot_id", flat=True)
+    )
+    if reservation.slot_id not in occupied:
+        return None
+    vehicle = (
+        Vehicle.objects.select_related("owner")
+        .filter(owner=reservation.driver, registration_no=reservation.vehicle_reg_no)
+        # A removed record can share the plate with a different type; the active one wins.
+        .order_by("-is_active", "-pk")
+        .first()
+    ) or SimpleNamespace(
+        vehicle_type=_VEHICLE_TYPE_FOR_SLOT.get(reservation.slot.slot_type, "Car"),
+        owner=reservation.driver,
+    )
+    period = reservation.period
+    candidates = [
+        slot
+        for slot in free_slots(reservation.slot.lot, vehicle, period.lower, period.upper)
+        if slot.pk not in occupied
+    ]
+
+    def try_move(slot):
+        try:
+            with transaction.atomic():
+                Reservation.objects.filter(pk=reservation.pk).update(slot=slot)
+        except IntegrityError as error:
+            constraint = getattr(getattr(error.__cause__, "diag", None), "constraint_name", None)
+            if constraint != "reservation_slot_period_no_overlap":
+                raise
+            return False  # A concurrent booking took it; try the next best.
+        return True
+
+    new_slot = allocate_slot_with_retry(candidates, vehicle, try_move)
+    if new_slot is None:
+        raise ValidationError({"__all__": SLOT_STILL_OCCUPIED})
+    return new_slot
 
 
 def check_in_vehicle(query: str, attendant, now=None):
@@ -55,9 +111,7 @@ def check_in_vehicle(query: str, attendant, now=None):
             Reservation.objects.select_for_update()
             .select_related("slot__lot")
             .filter(status=Reservation.Status.RESERVED)
-            .filter(
-                Q(booking_ref__iexact=query) | Q(vehicle_reg_no=registration)
-            )
+            .filter(Q(booking_ref__iexact=query) | Q(vehicle_reg_no=registration))
             .order_by("period")
         )
         # A plate can hold bookings on several days: take the earliest whose window is
@@ -103,25 +157,37 @@ def check_in_vehicle(query: str, attendant, now=None):
                 }
             )
 
+        original_slot = reservation.slot
+        new_slot = _reallocate_if_occupied(reservation)
+        if new_slot is not None:
+            reservation.slot = new_slot
+        reservation.reallocated_from = original_slot.code if new_slot else None
+
         # Success – activate
         reservation.status = Reservation.Status.ACTIVE
         reservation.entry_time = now
         reservation.save(update_fields=["status", "entry_time"])
 
+        after = {
+            "status": Reservation.Status.ACTIVE,
+            "entry_time": now.isoformat(),
+            "slot": reservation.slot.code,
+            "vehicle_reg_no": reservation.vehicle_reg_no,
+        }
+        if new_slot is not None:
+            after["reallocated_from"] = original_slot.code
+            after["reallocated_to"] = new_slot.code
+
         AuditLog.objects.create(
             actor=attendant,
             action="reservation.checked_in",
             target=f"reservation:{reservation.booking_ref}",
-            before={"status": Reservation.Status.RESERVED},
-            after={
-                "status": Reservation.Status.ACTIVE,
-                "entry_time": now.isoformat(),
-                "slot": reservation.slot.code,
-                "vehicle_reg_no": reservation.vehicle_reg_no,
-            },
+            before={"status": Reservation.Status.RESERVED, "slot": original_slot.code},
+            after=after,
         )
 
     return reservation
+
 
 def register_walk_in(attendant, lot, registration_no, vehicle_type, now=None):
     """Allocate a suitable slot until today's closing and record the arrival atomically."""
