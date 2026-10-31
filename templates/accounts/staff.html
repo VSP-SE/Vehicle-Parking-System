@@ -38,7 +38,9 @@
             </td>
 
             <td>
-                {% if staff.is_active %}
+                {% if staff.pk == user.pk %}
+                    (you)
+                {% elif staff.is_active %}
                     <form method="post"
                           action="{% url 'accounts:deactivate_staff' staff.pk %}"
                           class="inline">

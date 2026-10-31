@@ -161,3 +161,19 @@ class StaffManagementTests(TestCase):
             ).count(),
             1,
         )
+
+    def test_admin_cannot_deactivate_own_account(self):
+        """Self-deactivation could leave the lot with no administrator."""
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse("accounts:deactivate_staff", args=[self.admin.pk]), follow=True
+        )
+
+        self.admin.refresh_from_db()
+        self.assertTrue(self.admin.is_active)
+        self.assertContains(response, "You cannot deactivate your own account.")
+        self.assertFalse(AuditLog.objects.filter(action="staff.deactivated").exists())
+        self.assertNotContains(
+            response, reverse("accounts:deactivate_staff", args=[self.admin.pk])
+        )

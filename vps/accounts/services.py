@@ -130,6 +130,7 @@ def set_accessible_permit(admin, driver, has_permit):
         driver.save(update_fields=["accessible_permit"])
     return driver
 
+
 def _invalidate_user_sessions(user):
     """Delete all unexpired database sessions belonging to this user."""
     sessions = Session.objects.filter(expire_date__gt=timezone.now())
@@ -153,6 +154,9 @@ def deactivate_staff(admin, staff):
 
     if staff.role not in (User.Role.ATTENDANT, User.Role.ADMIN):
         raise ValidationError({"__all__": "Only staff accounts can be deactivated."})
+    if staff.pk == admin.pk:
+        # Otherwise the last administrator could lock everyone out of staff management.
+        raise ValidationError({"__all__": "You cannot deactivate your own account."})
 
     with transaction.atomic():
         staff = User.objects.select_for_update().get(pk=staff.pk)
