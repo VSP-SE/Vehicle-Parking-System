@@ -2,9 +2,12 @@
 
 import re
 
+from django.contrib.auth import SESSION_KEY
 from django.contrib.auth.password_validation import validate_password
+from django.contrib.sessions.models import Session
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
+from django.utils import timezone
 
 from vps.accounts.models import User
 from vps.accounts.roles import Function, can
@@ -126,3 +129,82 @@ def set_accessible_permit(admin, driver, has_permit):
         driver.accessible_permit = has_permit
         driver.save(update_fields=["accessible_permit"])
     return driver
+
+
+def _invalidate_user_sessions(user):
+    """Delete all unexpired database sessions belonging to this user."""
+    sessions = Session.objects.filter(expire_date__gt=timezone.now())
+
+    session_ids = [
+        session.session_key
+        for session in sessions.iterator()
+        if session.get_decoded().get(SESSION_KEY) == str(user.pk)
+    ]
+
+    if session_ids:
+        Session.objects.filter(session_key__in=session_ids).delete()
+
+
+def deactivate_staff(admin, staff):
+    """FR-AUTH-05: deactivate a staff account and invalidate its sessions."""
+    if not can(admin, Function.MANAGE_STAFF):
+        raise ValidationError(
+            {"__all__": "Only Lot Administrators may manage staff accounts."}
+        )
+
+    if staff.role not in (User.Role.ATTENDANT, User.Role.ADMIN):
+        raise ValidationError({"__all__": "Only staff accounts can be deactivated."})
+    if staff.pk == admin.pk:
+        # Otherwise the last administrator could lock everyone out of staff management.
+        raise ValidationError({"__all__": "You cannot deactivate your own account."})
+
+    with transaction.atomic():
+        staff = User.objects.select_for_update().get(pk=staff.pk)
+
+        if not staff.is_active:
+            return staff
+
+        staff.is_active = False
+        staff.save(update_fields=["is_active"])
+
+        _invalidate_user_sessions(staff)
+
+        AuditLog.objects.create(
+            actor=admin,
+            action="staff.deactivated",
+            target=f"user:{staff.pk}",
+            before={"is_active": True},
+            after={"is_active": False},
+        )
+
+    return staff
+
+
+def reactivate_staff(admin, staff):
+    """FR-AUTH-05: reactivate a previously deactivated staff account."""
+    if not can(admin, Function.MANAGE_STAFF):
+        raise ValidationError(
+            {"__all__": "Only Lot Administrators may manage staff accounts."}
+        )
+
+    if staff.role not in (User.Role.ATTENDANT, User.Role.ADMIN):
+        raise ValidationError({"__all__": "Only staff accounts can be reactivated."})
+
+    with transaction.atomic():
+        staff = User.objects.select_for_update().get(pk=staff.pk)
+
+        if staff.is_active:
+            return staff
+
+        staff.is_active = True
+        staff.save(update_fields=["is_active"])
+
+        AuditLog.objects.create(
+            actor=admin,
+            action="staff.reactivated",
+            target=f"user:{staff.pk}",
+            before={"is_active": False},
+            after={"is_active": True},
+        )
+
+    return staff

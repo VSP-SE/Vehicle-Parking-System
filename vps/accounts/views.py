@@ -162,3 +162,56 @@ class PasswordResetConfirmView(auth_views.PasswordResetConfirmView):
 
 class PasswordResetCompleteView(auth_views.PasswordResetCompleteView):
     template_name = "accounts/password_reset_complete.html"
+
+
+@role_required(User.Role.ADMIN)
+@require_safe
+def staff_list(request):
+    """FR-AUTH-05: display all Gate Attendants and Lot Administrators."""
+    staff_members = User.objects.filter(
+        role__in=[User.Role.ATTENDANT, User.Role.ADMIN]
+    ).order_by("role", "full_name", "email")
+
+    return render(
+        request,
+        "accounts/staff.html",
+        {"staff_members": staff_members},
+    )
+
+
+@role_required(User.Role.ADMIN)
+@require_POST
+def deactivate_staff(request, user_id):
+    staff = get_object_or_404(
+        User,
+        pk=user_id,
+        role__in=[User.Role.ATTENDANT, User.Role.ADMIN],
+    )
+
+    try:
+        services.deactivate_staff(request.user, staff)
+    except ValidationError as error:
+        messages.error(request, error.messages[0])
+    else:
+        messages.success(request, f"Staff account {staff.email} deactivated.")
+
+    return redirect("accounts:staff_list")
+
+
+@role_required(User.Role.ADMIN)
+@require_POST
+def reactivate_staff(request, user_id):
+    staff = get_object_or_404(
+        User,
+        pk=user_id,
+        role__in=[User.Role.ATTENDANT, User.Role.ADMIN],
+    )
+
+    try:
+        services.reactivate_staff(request.user, staff)
+    except ValidationError as error:
+        messages.error(request, error.messages[0])
+    else:
+        messages.success(request, f"Staff account {staff.email} reactivated.")
+
+    return redirect("accounts:staff_list")

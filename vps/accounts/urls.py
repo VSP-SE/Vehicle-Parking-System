@@ -37,4 +37,15 @@ urlpatterns = [
         views.PasswordResetCompleteView.as_view(),
         name="password_reset_complete",
     ),
+    path("staff/", views.staff_list, name="staff_list"),
+    path(
+        "staff/<int:user_id>/deactivate/",
+        views.deactivate_staff,
+        name="deactivate_staff",
+    ),
+    path(
+        "staff/<int:user_id>/reactivate/",
+        views.reactivate_staff,
+        name="reactivate_staff",
+    ),
 ]
