@@ -5,7 +5,7 @@ from datetime import time
 from django.utils import timezone
 
 from vps.accounts.models import User
-from vps.lots.models import Lot, Slot
+from vps.lots.models import Lot, Slot, Tariff
 from vps.lots.services import create_lot, create_tariff
 
 PES_LOTS = [
@@ -63,13 +63,39 @@ def _tariff_actor(actor=None):
     return User.objects.filter(is_active=True, role=User.Role.ADMIN).order_by("pk").first()
 
 
+def _ensure_tariffs(lot, actor, today):
+    """Give each slot type a rate. Without an admin yet (first container start) the seed
+    writes the rows directly, as seed_demo_data does; with one, changes go through the
+    audited service."""
+    priced = set(lot.tariffs.values_list("slot_type", flat=True))
+    for slot_type, rate in _RATES.items():
+        if slot_type in priced:
+            continue
+        if actor is None:
+            Tariff.objects.create(
+                lot=lot, slot_type=slot_type, hourly_rate_inr=rate, effective_from=today
+            )
+        else:
+            create_tariff(
+                lot=lot,
+                slot_type=slot_type,
+                hourly_rate_inr=rate,
+                effective_from=today,
+                actor=actor,
+                today=today,
+            )
+
+
 def seed_pes_lots(actor=None, today=None) -> list[Lot]:
     names = [spec["name"] for spec in PES_LOTS]
-    if set(Lot.objects.filter(name__in=names).values_list("name", flat=True)) == set(names):
-        return []
-
     actor = _tariff_actor(actor)
     today = today or timezone.localdate()
+    existing = Lot.objects.filter(name__in=names)
+    for lot in existing:
+        _ensure_tariffs(lot, actor, today)
+    if set(existing.values_list("name", flat=True)) == set(names):
+        return []
+
     created = []
     for spec in PES_LOTS:
         if Lot.objects.filter(name=spec["name"]).exists():
@@ -93,15 +119,6 @@ def seed_pes_lots(actor=None, today=None) -> list[Lot]:
                 for index in range(1, count + 1)
             )
         Slot.objects.bulk_create(slots)
-        if actor is not None:
-            for slot_type, rate in _RATES.items():
-                create_tariff(
-                    lot=lot,
-                    slot_type=slot_type,
-                    hourly_rate_inr=rate,
-                    effective_from=today,
-                    actor=actor,
-                    today=today,
-                )
+        _ensure_tariffs(lot, actor, today)
         created.append(lot)
     return created

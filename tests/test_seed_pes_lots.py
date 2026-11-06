@@ -68,3 +68,28 @@ def test_command_output():
     out = StringIO()
     call_command("seed_pes_lots", stdout=out)
     assert "PES lots already present." in out.getvalue()
+
+
+def test_tariffs_created_even_without_admin():
+    # The web container seeds on start, before anyone has created an admin account.
+    created = seed_pes_lots(today=date(2026, 11, 6))
+    for lot in created:
+        assert lot.tariffs.count() == 4
+
+
+def test_rerun_backfills_missing_tariffs():
+    created = seed_pes_lots(today=date(2026, 11, 6))
+    for lot in created:
+        lot.tariffs.all().delete()
+    assert seed_pes_lots(today=date(2026, 11, 7)) == []
+    for lot in created:
+        tariff = lot.tariffs.get(slot_type=Slot.SlotType.STANDARD)
+        assert tariff.hourly_rate_inr == Decimal("30.00")
+        assert tariff.effective_from == date(2026, 11, 7)
+
+
+def test_command_without_admin_still_prices_lots():
+    out = StringIO()
+    call_command("seed_pes_lots", stdout=out)
+    assert "Seeded 4 PES lots (832 slots)." in out.getvalue()
+    assert "skipped tariffs" not in out.getvalue()
