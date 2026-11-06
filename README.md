@@ -7,13 +7,18 @@
 A full parking-lot platform for drivers, gate attendants and lot administrators,<br>
 with race-safe slot allocation and a machine-learning availability forecast.
 
-[![CI](https://github.com/VSP-SE/Vehicle-Parking-System/actions/workflows/ci.yml/badge.svg)](https://github.com/VSP-SE/Vehicle-Parking-System/actions/workflows/ci.yml)
-![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
-![Django](https://img.shields.io/badge/Django-5.2-092E20?logo=django&logoColor=white)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-forecast-009688?logo=fastapi&logoColor=white)
-![Coverage](https://img.shields.io/badge/coverage-95.94%25-2ea44f)
-![Tests](https://img.shields.io/badge/tests-771%20passing-2ea44f)
+[![Test Plan](https://img.shields.io/badge/Test%20Plan-49%20of%2051%20Pass%20%C2%B7%200%20Fail-2E7D32?style=for-the-badge&labelColor=66BB6A)](docs/part-3/system-validation-report.md)
+[![Tests](https://img.shields.io/badge/Tests-771%20Passing-1B5E20?style=for-the-badge&labelColor=43A047&logo=pytest&logoColor=FFFFFF)](docs/part-3/unit-test-report.md)
+[![Coverage](https://img.shields.io/badge/Coverage-95.94%25%20Line%20%C2%B7%2091.01%25%20Branch-00695C?style=for-the-badge&labelColor=26A69A)](docs/part-3/code-coverage-report.md)
+[![Load](https://img.shields.io/badge/Load-200%20Sessions%20%C2%B7%200%20Failures-1565C0?style=for-the-badge&labelColor=42A5F5)](docs/part-3/system-validation-report.md)
+[![Accessibility](https://img.shields.io/badge/Accessibility-WCAG%202.1%20AA%20%C2%B7%200%20Violations-6A1B9A?style=for-the-badge&labelColor=AB47BC)](docs/part-3/system-validation-report.md)
+[![Allocation](https://img.shields.io/badge/Allocation-Race--Safe%20%C2%B7%20Advisory%20Lock-B71C1C?style=for-the-badge&labelColor=EF5350)](vps/reservations/services.py)
+[![Forecast](https://img.shields.io/badge/Forecast-FastAPI%20%C2%B7%20scikit--learn-E65100?style=for-the-badge&labelColor=FF9800&logo=fastapi&logoColor=FFFFFF)](forecast/)
+[![Language](https://img.shields.io/badge/Language-Python%203.12-1C1C1C?style=for-the-badge&labelColor=424242&logo=python&logoColor=FFD700)](requirements.txt)
+[![Framework](https://img.shields.io/badge/Framework-Django%205.2-092E20?style=for-the-badge&labelColor=2E7D32&logo=django&logoColor=FFFFFF)](requirements.txt)
+[![Database](https://img.shields.io/badge/Database-PostgreSQL%2016-1A237E?style=for-the-badge&labelColor=5C6BC0&logo=postgresql&logoColor=FFFFFF)](compose.yaml)
+[![CI](https://img.shields.io/badge/CI-Lint%20%C2%B7%20Tests%20%C2%B7%20Security-512DA8?style=for-the-badge&labelColor=9575CD&logo=githubactions&logoColor=FFFFFF)](.github/workflows/ci.yml)
+[![Team](https://img.shields.io/badge/Team-10%20%C2%B7%20PES%20University-B8860B?style=for-the-badge&labelColor=FFD54F)](#team)
 
 [Features](#features) · [Screenshots](#screenshots) · [Architecture](#architecture) · [Quick start](#quick-start) · [Testing](#testing) · [Docs](#documentation) · [Team](#team)
 
